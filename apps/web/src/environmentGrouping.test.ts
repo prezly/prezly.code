@@ -6,12 +6,14 @@ import {
   deriveLogicalProjectKeyFromSettings,
   derivePhysicalProjectKey,
   getProjectOrderKey,
+  resolveProductProjectGroupingSettings,
   resolveProjectGroupingMode,
 } from "./logicalProject";
 import {
   buildPhysicalToLogicalProjectKeyMap,
   buildSidebarProjectPickerEntries,
   buildSidebarProjectSnapshots,
+  resolveSidebarProjectDisplayName,
 } from "./sidebarProjectGrouping";
 import { orderItemsByPreferredIds } from "./components/Sidebar.logic";
 import { legacyProjectCwdPreferenceKey } from "./uiStateStore";
@@ -51,6 +53,33 @@ function makeProject(overrides: Partial<Project> = {}): Project {
 }
 
 describe("environment grouping", () => {
+  it("keeps every managed environment as a separate project", () => {
+    expect(resolveProductProjectGroupingSettings(defaultGroupingSettings, true)).toEqual({
+      sidebarProjectGroupingMode: "separate",
+      sidebarProjectGroupingOverrides: {},
+    });
+    expect(resolveProductProjectGroupingSettings(defaultGroupingSettings, false)).toBe(
+      defaultGroupingSettings,
+    );
+  });
+
+  it("uses the environment label for managed project presentation", () => {
+    expect(
+      resolveSidebarProjectDisplayName({
+        groupLabel: "prezly/website-nextjs",
+        environmentLabel: "website-upgrade-deps",
+        managedProjects: true,
+      }),
+    ).toBe("website-upgrade-deps");
+    expect(
+      resolveSidebarProjectDisplayName({
+        groupLabel: "prezly/website-nextjs",
+        environmentLabel: "website-upgrade-deps",
+        managedProjects: false,
+      }),
+    ).toBe("prezly/website-nextjs");
+  });
+
   it("groups matching repository identities across environments", () => {
     const primary = makeProject({ repositoryIdentity });
     const remote = makeProject({

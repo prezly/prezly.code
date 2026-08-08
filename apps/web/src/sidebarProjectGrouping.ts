@@ -1,4 +1,5 @@
 import type { EnvironmentId, ScopedProjectRef } from "@t3tools/contracts";
+import { PRODUCT_CAPABILITIES } from "./branding";
 import { buildProjectGroups, type ProjectGroupingSettings } from "./logicalProject";
 import type { Project } from "./types";
 
@@ -29,6 +30,16 @@ export interface SidebarProjectPickerEntry {
   group: SidebarProjectSnapshot;
   targetProject: SidebarProjectGroupMember;
   isPreferred: boolean;
+}
+
+export function resolveSidebarProjectDisplayName(input: {
+  readonly groupLabel: string;
+  readonly environmentLabel: string | null;
+  readonly managedProjects: boolean;
+}): string {
+  return input.managedProjects && input.environmentLabel
+    ? input.environmentLabel
+    : input.groupLabel;
 }
 
 export function buildPhysicalToLogicalProjectKeyMap(input: {
@@ -102,7 +113,11 @@ export function buildSidebarProjectSnapshots(input: {
     return {
       ...representative,
       projectKey: group.key,
-      displayName: group.label,
+      displayName: resolveSidebarProjectDisplayName({
+        groupLabel: group.label,
+        environmentLabel: representative.environmentLabel,
+        managedProjects: PRODUCT_CAPABILITIES.managedProjects,
+      }),
       groupedProjectCount: members.length,
       environmentPresence:
         hasLocal && hasRemote ? "mixed" : hasRemote ? "remote-only" : "local-only",
