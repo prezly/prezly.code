@@ -20,6 +20,7 @@ export type ThreadActionMenuId =
   | "mark-unread"
   | "copy-path"
   | "copy-branch"
+  | "refresh-jude-environments"
   | "delete";
 
 export interface ThreadActionMenuState {
@@ -34,6 +35,7 @@ export interface ThreadActionMenuState {
     readonly snooze: boolean;
     readonly pinning: boolean;
     readonly titleRegeneration: boolean;
+    readonly environmentRefresh: boolean;
   };
   readonly snoozePresets: ReadonlyArray<SnoozePreset>;
 }
@@ -100,6 +102,9 @@ export function buildThreadActionMenuItems(
     { id: "mark-unread", label: "Mark unread" },
     { id: "copy-path", label: "Copy path", icon: "copy" },
     ...(state.branch ? [{ id: "copy-branch" as const, label: "Copy branch", icon: "copy" }] : []),
+    ...(state.supports.environmentRefresh
+      ? [{ id: "refresh-jude-environments" as const, label: "Refresh Jude environments" }]
+      : []),
     { id: "delete", label: "Delete", destructive: true, icon: "trash" },
   ];
 }

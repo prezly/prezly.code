@@ -35,6 +35,8 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { useThreadActions } from "./useThreadActions";
+import { PRODUCT_CAPABILITIES } from "../branding";
+import { refreshJudeEnvironments } from "../connection/jude";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -112,6 +114,7 @@ export function useThreadActionMenu(input: {
           snooze: readEnvironmentSupportsSnooze(threadRef.environmentId),
           pinning: readEnvironmentSupportsPinning(threadRef.environmentId),
           titleRegeneration: readEnvironmentSupportsTitleRegeneration(threadRef.environmentId),
+          environmentRefresh: PRODUCT_CAPABILITIES.managedProjects,
         };
         const isRegeneratingTitle = thread.titleRegeneration != null;
         const snoozePresets = resolveSnoozePresets(now, timestampFormat);
@@ -240,6 +243,13 @@ export function useThreadActionMenu(input: {
           case "copy-branch":
             if (thread.branch) {
               copyBranchToClipboard(thread.branch, { branch: thread.branch });
+            }
+            return;
+          case "refresh-jude-environments":
+            try {
+              await refreshJudeEnvironments();
+            } catch (error) {
+              failureToast("Could not refresh Jude environments", error);
             }
             return;
           case "delete": {

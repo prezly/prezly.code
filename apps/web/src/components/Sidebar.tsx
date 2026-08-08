@@ -2791,6 +2791,7 @@ export default function Sidebar() {
                 snooze: supportsSnooze,
                 pinning: supportsPinning,
                 titleRegeneration: supportsTitleRegeneration,
+                environmentRefresh: PRODUCT_CAPABILITIES.managedProjects,
               },
               snoozePresets,
             }),
@@ -2886,6 +2887,9 @@ export default function Sidebar() {
               copyBranchToClipboard(thread.branch, { branch: thread.branch });
             }
             return;
+          case "refresh-jude-environments":
+            await handleRefreshJude();
+            return;
           case "delete": {
             if (confirmThreadDelete) {
               const confirmed = await settlePromise(() =>
@@ -2929,6 +2933,7 @@ export default function Sidebar() {
       copyPathToClipboard,
       deleteThread,
       handleMultiSelectContextMenu,
+      handleRefreshJude,
       markThreadUnread,
       projectCwdByKey,
       serverConfigs,

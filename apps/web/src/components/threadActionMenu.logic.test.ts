@@ -9,7 +9,13 @@ const baseState: ThreadActionMenuState = {
   isSnoozed: false,
   canSnoozeNow: true,
   isRegeneratingTitle: false,
-  supports: { settlement: true, snooze: true, pinning: true, titleRegeneration: true },
+  supports: {
+    settlement: true,
+    snooze: true,
+    pinning: true,
+    titleRegeneration: true,
+    environmentRefresh: false,
+  },
   snoozePresets: [
     { id: "hour", label: "In 1 hour", whenLabel: "3:00 PM", snoozedUntil: "2026-08-07T15:00:00Z" },
   ],
@@ -24,7 +30,13 @@ describe("buildThreadActionMenuItems", () => {
     expect(
       ids({
         ...baseState,
-        supports: { settlement: false, snooze: false, pinning: false, titleRegeneration: false },
+        supports: {
+          settlement: false,
+          snooze: false,
+          pinning: false,
+          titleRegeneration: false,
+          environmentRefresh: false,
+        },
       }),
     ).toEqual(["rename", "mark-unread", "copy-path", "delete"]);
   });
@@ -62,5 +74,14 @@ describe("buildThreadActionMenuItems", () => {
   it("marks delete as destructive and keeps it last", () => {
     const items = buildThreadActionMenuItems({ ...baseState, branch: "main" });
     expect(items.at(-1)).toMatchObject({ id: "delete", destructive: true });
+  });
+
+  it("adds Jude refresh when managed environments support it", () => {
+    const menuIds = ids({
+      ...baseState,
+      supports: { ...baseState.supports, environmentRefresh: true },
+    });
+    expect(menuIds).toContain("refresh-jude-environments");
+    expect(menuIds.indexOf("refresh-jude-environments")).toBe(menuIds.length - 2);
   });
 });
