@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 import * as Effect from "effect/Effect";
 import * as FileSystem from "effect/FileSystem";
 import * as Layer from "effect/Layer";
@@ -23,6 +24,7 @@ const makeEnvironment = (overrides: Record<string, unknown> = {}) =>
     isPackaged: true,
     isDevelopment: false,
     displayName: "T3 Code (Alpha)",
+    productProfile: resolveProductProfile("t3"),
     linuxWmClass: "t3code",
     linuxApplicationsDir: "/home/alice/.local/share/applications",
     appImagePath: Option.some("/home/alice/Applications/T3-Code.AppImage"),

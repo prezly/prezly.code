@@ -1,4 +1,5 @@
 import { assert, describe, it } from "@effect/vitest";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
@@ -32,6 +33,7 @@ import * as DesktopEnvironment from "./DesktopEnvironment.ts";
 const makeDesktopClerkLayer = (isDevelopment = true, events: string[] = []) => {
   const environment = DesktopEnvironment.DesktopEnvironment.of({
     stateDir: "/tmp/t3-state",
+    productProfile: resolveProductProfile("t3"),
     isDevelopment,
     appDataDirectory: "/tmp/app-data",
     userDataDirName: isDevelopment ? "t3code-dev" : "t3code",
