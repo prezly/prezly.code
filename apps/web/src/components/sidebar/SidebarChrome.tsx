@@ -2,6 +2,7 @@ import { ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import { memo, useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 
+import { APP_BASE_NAME, PRODUCT_PROFILE } from "../../branding";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import {
@@ -72,22 +73,28 @@ export const SidebarChromeHeader = memo(function SidebarChromeHeader({
 function SidebarBrand({ onBackdrop }: { onBackdrop: boolean }) {
   return (
     <Link
-      aria-label="Go to threads"
+      aria-label={`${APP_BASE_NAME}: go to threads`}
       className={cn(
         "sidebar-brand relative z-10 ml-[var(--workspace-titlebar-content-left)] h-7 w-fit min-w-0 shrink-0 items-center gap-1 overflow-hidden rounded-md outline-hidden ring-ring focus-visible:ring-2",
         onBackdrop ? "text-white" : "text-foreground",
       )}
       to="/"
     >
-      <T3Wordmark />
-      <span
-        className={cn(
-          "truncate text-sm font-medium tracking-tight",
-          onBackdrop ? "text-white/70" : "text-muted-foreground",
-        )}
-      >
-        Code
-      </span>
+      {PRODUCT_PROFILE.id === "p3" ? (
+        <span className="truncate text-sm font-semibold tracking-tight">{APP_BASE_NAME}</span>
+      ) : (
+        <>
+          <T3Wordmark />
+          <span
+            className={cn(
+              "truncate text-sm font-medium tracking-tight",
+              onBackdrop ? "text-white/70" : "text-muted-foreground",
+            )}
+          >
+            Code
+          </span>
+        </>
+      )}
     </Link>
   );
 }
