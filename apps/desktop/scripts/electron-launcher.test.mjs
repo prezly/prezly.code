@@ -19,6 +19,7 @@ describe("electron development launcher", () => {
         displayName: "Prezly.code",
         bundleId: "com.prezly.p3code",
         protocolSchemes: ["p3code"],
+        macIconFileName: "prezly-code.icns",
         macIconPngPath: "assets/p3/prezly-code-macos-1024.png",
       },
     );

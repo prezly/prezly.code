@@ -29,6 +29,7 @@ export function resolveLauncherBranding({ development, productProfileId, repoNam
       protocolSchemes: development
         ? [`${profile.desktop.protocolScheme}-dev`]
         : [profile.desktop.protocolScheme],
+      macIconFileName: "prezly-code.icns",
       macIconPngPath: "assets/p3/prezly-code-macos-1024.png",
     };
   }
@@ -41,6 +42,7 @@ export function resolveLauncherBranding({ development, productProfileId, repoNam
     protocolSchemes: development
       ? [`${profile.desktop.protocolScheme}-dev`]
       : [profile.desktop.protocolScheme],
+    macIconFileName: "icon.icns",
     macIconPngPath: "assets/dev/blueprint-macos-1024.png",
   };
 }
@@ -53,7 +55,7 @@ const launcherBranding = resolveLauncherBranding({
 export const APP_DISPLAY_NAME = launcherBranding.displayName;
 export const APP_BUNDLE_ID = launcherBranding.bundleId;
 const APP_PROTOCOL_SCHEMES = launcherBranding.protocolSchemes;
-const LAUNCHER_VERSION = 15;
+const LAUNCHER_VERSION = 16;
 const defaultIconPath = NodePath.join(desktopDir, "resources", "icon.icns");
 const launcherMacIconPngPath = NodePath.join(repoRoot, launcherBranding.macIconPngPath);
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher script has no Effect runtime.
@@ -255,7 +257,7 @@ function patchMainBundleInfoPlist(appBundlePath, iconPath, executableName) {
   setPlistString(infoPlistPath, "CFBundleName", APP_DISPLAY_NAME);
   setPlistString(infoPlistPath, "CFBundleIdentifier", APP_BUNDLE_ID);
   setPlistString(infoPlistPath, "CFBundleExecutable", executableName);
-  setPlistString(infoPlistPath, "CFBundleIconFile", "icon.icns");
+  setPlistString(infoPlistPath, "CFBundleIconFile", launcherBranding.macIconFileName);
   setPlistJson(infoPlistPath, "CFBundleURLTypes", [
     {
       CFBundleURLName: APP_BUNDLE_ID,
@@ -264,7 +266,7 @@ function patchMainBundleInfoPlist(appBundlePath, iconPath, executableName) {
   ]);
 
   const resourcesDir = NodePath.join(appBundlePath, "Contents", "Resources");
-  NodeFS.copyFileSync(iconPath, NodePath.join(resourcesDir, "icon.icns"));
+  NodeFS.copyFileSync(iconPath, NodePath.join(resourcesDir, launcherBranding.macIconFileName));
   NodeFS.copyFileSync(iconPath, NodePath.join(resourcesDir, "electron.icns"));
 }
 
