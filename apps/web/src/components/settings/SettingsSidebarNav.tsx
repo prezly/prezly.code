@@ -35,6 +35,7 @@ import {
 } from "../ui/sidebar";
 import { T3ConnectSidebarAvatar, T3ConnectSidebarSignIn } from "../clerk/T3ConnectSidebarSignIn";
 import { scrollToSettingsTarget } from "./settingsLayout";
+import { PRODUCT_CAPABILITIES } from "~/branding";
 import {
   searchSettings,
   SETTINGS_SECTION_LABELS,
@@ -77,7 +78,16 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState("");
   const [activeResultIndex, setActiveResultIndex] = useState(0);
-  const results = useMemo(() => searchSettings(query), [query]);
+  const results = useMemo(
+    () =>
+      searchSettings(query).filter(
+        (item) => !PRODUCT_CAPABILITIES.managedProjects || item.to !== "/settings/source-control",
+      ),
+    [query],
+  );
+  const navItems = PRODUCT_CAPABILITIES.managedProjects
+    ? SETTINGS_NAV_ITEMS.filter((item) => item.to !== "/settings/source-control")
+    : SETTINGS_NAV_ITEMS;
   const isSearching = query.trim().length > 0;
   const hasResults = results.length > 0;
 
@@ -277,7 +287,7 @@ export function SettingsSidebarNav({ pathname }: { pathname: string }) {
                     </SidebarMenuButton>
                   </SidebarMenuItem>
                 ))
-              : SETTINGS_NAV_ITEMS.map((item) => {
+              : navItems.map((item) => {
                   const Icon = item.icon;
                   const isActive = pathname === item.to;
                   return (
