@@ -1,107 +1,83 @@
-# T3 Code
+# Prezly.code
 
-T3 Code is an "agent harness control surface". It enables control of the agents on your machine with a best-in-class mobile app ([iOS](https://apps.apple.com/us/app/t3-code-remote-claude-more/id6787819824), [Android](https://play.google.com/store/apps/details?id=com.t3tools.t3code)), [web app](https://app.t3.codes) and [Electron-based desktop app](https://t3.codes).
+Prezly.code is Prezly's dedicated desktop app for working with coding agents in
+[Jude](https://jude.prezly.net). It is a focused downstream fork of
+[T3 Code](https://github.com/pingdotgg/t3code): we keep T3's fast, multi-provider
+agent interface and replace its local-workspace model with Jude-managed environments.
 
-Works with your subscriptions on Claude Code, Codex, Cursor, Grok Build, and OpenCode. If they're set up on your computer, T3 Code can control them.
+## The idea
 
-## "Wait, what are you selling me?"
+Jude owns the machines, repositories, and worktrees. Prezly.code is the control
+surface for the conversations running there.
 
-Nothing. We built T3 Code because we wanted the best possible development experience with agents. We were inspired by existing solutions like the Codex desktop app, Conductor, Claude Desktop and Cursor Glass, but none met our bar.
+- Every ready Jude environment appears as a project automatically.
+- A Jude environment can contain multiple prompts and threads.
+- The workspace is always `/source`; Prezly.code never asks for a directory.
+- There is no local-development or local-worktree mode. Jude environments are
+  already isolated worktrees.
+- Removing an environment from Jude removes it from Prezly.code after the next
+  successful sync.
+- Discovery runs every three seconds. You can also refresh from the sidebar,
+  Connections settings, or a thread's context menu.
+- Jude currently relies on Warp network access and does not require separate
+  authentication. User-scoped Jude environments can be added later.
 
-We wanted something performant, remote-ready, and truly open. If we ever go the wrong direction, we want you to have everything you need to fork and build the editor that you want.
+If Jude is temporarily unreachable, Prezly.code keeps valid cached connections
+and retries. A failed request is never treated as an authoritative deletion.
 
-## Installation
+## For Prezlians
 
-> [!WARNING]
-> T3 Code currently supports Codex, Claude, Cursor, Grok Build and OpenCode. Install and authenticate at least one provider before use:
->
-> - Codex: install [Codex CLI](https://developers.openai.com/codex/cli) and run `codex login`
-> - Claude: install [Claude Code](https://claude.com/product/claude-code) and run `claude auth login`
-> - Cursor: install [Cursor CLI](https://cursor.com/cli) and run `agent login`
-> - Grok Build: install [Grok Build CLI](https://x.ai/cli) and run `grok login`
-> - OpenCode: install [OpenCode](https://opencode.ai) and run `opencode auth login`
+1. Connect to the Prezly network through Warp.
+2. Open Prezly.code.
+3. Pick a Jude environment from the project switcher.
+4. Continue an existing prompt or start another thread in that environment.
 
-### Try it out (install-free)
+Unsigned desktop installers for macOS, Windows, and Linux are built by GitHub
+Actions. Open the latest **Build Prezly.code desktop installers** workflow run
+and download the artifact for your platform.
 
-The easiest way to test T3 Code is to run the server in your terminal (requires Node.js 22.16+, 23.11+, or 24.10+):
+## Building locally
 
-```bash
-npx t3@latest
-```
-
-This will launch T3 Code's backend on your machine as well as the local web app to control your agents.
-
-Tip: Use `npx t3@latest --help` for the full CLI reference.
-
-### Desktop app
-
-Install the latest version of the desktop app from [GitHub Releases](https://github.com/pingdotgg/t3code/releases), or from your favorite package registry:
-
-#### Windows (`winget`)
-
-```bash
-winget install T3Tools.T3Code
-```
-
-#### macOS (Homebrew)
+Install the repository's Vite+ toolchain and dependencies, then build the P3
+product profile:
 
 ```bash
-brew install --cask t3-code
+vp install
+T3CODE_PRODUCT_PROFILE=p3 vp run build:desktop
 ```
 
-#### Arch Linux (AUR)
+Launch the built desktop app:
 
 ```bash
-yay -S t3code-bin
+T3CODE_PRODUCT_PROFILE=p3 node apps/desktop/scripts/start-electron.mjs
 ```
 
-## Some notes
+## Keeping up with T3 Code
 
-We are very very early in this project. Expect bugs.
+The remotes in the primary checkout are intentionally split:
 
-We are (mostly) not accepting contributions yet. Small fixes may be considered. Big features will not be.
+- `origin` is `prezly/prezly.code`.
+- `upstream` is `pingdotgg/t3code`.
 
-## Documentation
-
-Full docs live in [docs/](./docs). There's no docs site yet.
-
-- [Install and first run](./docs/user/install.md)
-- [Permission modes](./docs/user/permission-modes.md)
-- [Keyboard shortcuts](./docs/user/keybindings.md)
-- [Remote access from a phone or another machine](./docs/user/remote-access.md)
-- [Keeping app and server in sync](./docs/user/updating.md)
-- [Source control integrations](./docs/user/source-control.md)
-- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
-- Linux: [run T3 Code as a background service](./docs/user/background-service.md)
-
-Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
-
-## If you REALLY want to contribute still.... read this first
-
-### Install `vp`
-
-T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
-
-#### macOS / Linux
+Prezly-specific behavior lives behind the `p3` product profile and is kept in
+small, focused commits. To bring in upstream changes:
 
 ```bash
-curl -fsSL https://vite.plus | bash
+git fetch upstream
+git merge upstream/main
+git push origin main
 ```
 
-#### Windows
+Resolve conflicts by preserving upstream's default `t3` behavior and applying
+Prezly differences only when the `p3` profile is active. Do not rename upstream
+packages or broadly replace T3 terminology in shared code; that makes future
+merges unnecessarily difficult.
 
-```bash
-irm https://vite.plus/ps1 | iex
-```
+## Relationship to upstream
 
-Checkout their getting started guide for more information: https://viteplus.dev/guide/
+T3 Code remains the foundation and source of general product improvements.
+Prezly.code should contain only the Jude integration, Prezly identity, focused
+product decisions, and the build/release configuration needed by Prezlians.
 
-### Install dependencies
-
-```bash
-vp i
-```
-
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
-
-Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
+The upstream project is open source. Its original license and notices remain in
+this repository.
