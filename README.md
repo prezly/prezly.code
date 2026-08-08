@@ -32,9 +32,9 @@ and retries. A failed request is never treated as an authoritative deletion.
 3. Pick a Jude environment from the project switcher.
 4. Continue an existing prompt or start another thread in that environment.
 
-Unsigned desktop installers for macOS, Windows, and Linux are built by GitHub
-Actions. Open the latest **Build Prezly.code desktop installers** workflow run
-and download the artifact for your platform.
+Unsigned desktop installers for macOS, Windows, and Linux are published on the
+[Prezly.code Releases page](https://github.com/prezly/prezly.code/releases).
+Each version has its release notes and all platform installers in one place.
 
 ## Building locally
 
@@ -51,6 +51,25 @@ Launch the built desktop app:
 ```bash
 T3CODE_PRODUCT_PROFILE=p3 node apps/desktop/scripts/start-electron.mjs
 ```
+
+## Making a release
+
+Prezly.code uses semantic versions and `v` tags, following T3 Code's release
+shape. The first Prezly-specific version is `v0.1.0` because the fork already
+contains upstream's earlier `v0.0.x` tags.
+
+Create and push a version tag from the commit to release:
+
+```bash
+git tag -a v0.1.0 -m "Prezly.code v0.1.0"
+git push origin v0.1.0
+```
+
+The **Build Prezly.code desktop installers** workflow then builds macOS arm64,
+macOS Intel, Linux x64, and Windows x64. After every build succeeds, it creates
+the GitHub Release, generates release notes from the commits since the previous
+version, and attaches the installers and update metadata. A normal push to
+`main` only produces temporary workflow artifacts; it does not create a release.
 
 ## Keeping up with T3 Code
 
