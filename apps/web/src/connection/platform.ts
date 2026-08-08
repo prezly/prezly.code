@@ -60,7 +60,12 @@ import {
 } from "./desktopLocal";
 import { connectionStorageLayer } from "./storage";
 import { PRODUCT_PROFILE } from "../branding";
-import { issueJudeT3Pairing, listJudeSessions, type JudeSession } from "./jude";
+import {
+  issueJudeT3Pairing,
+  listJudeSessions,
+  subscribeToJudeEnvironmentRefresh,
+  type JudeSession,
+} from "./jude";
 
 let nextObservedRpcRequestId = 0;
 
@@ -513,6 +518,14 @@ const platformConnectionSourceLayer = Layer.effect(
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
 
     if (PRODUCT_PROFILE.id === "p3") {
+      const manualRefreshes = Stream.callback<void>((queue) =>
+        Effect.acquireRelease(
+          Effect.sync(() =>
+            subscribeToJudeEnvironmentRefresh(() => Queue.offerUnsafe(queue, undefined)),
+          ),
+          (unsubscribe) => Effect.sync(unsubscribe),
+        ).pipe(Effect.asVoid),
+      );
       const buildJudePlatformRegistrations = Effect.gen(function* () {
         const previous = yield* Ref.get(cacheRef);
         const nowEpochMs = yield* Clock.currentTimeMillis;
@@ -585,7 +598,7 @@ const platformConnectionSourceLayer = Layer.effect(
       }).pipe(Effect.provide(FetchHttpClient.layer));
 
       return PlatformConnectionSource.of({
-        registrations: Stream.tick(PLATFORM_POLL_INTERVAL).pipe(
+        registrations: Stream.merge(Stream.tick(PLATFORM_POLL_INTERVAL), manualRefreshes).pipe(
           Stream.mapEffect(() => buildJudePlatformRegistrations),
         ),
       });

@@ -232,6 +232,8 @@ import {
 } from "@t3tools/client-runtime/state/threads";
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
+import { judeAppNameForConnection } from "../connection/jude";
+import { useJudeSessions } from "../hooks/useJudeSessions";
 import {
   useProject,
   useProjects,
@@ -1220,6 +1222,7 @@ function ChatViewContent(props: ChatViewProps) {
   const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
   const closePreview = useAtomCommand(previewEnvironment.close, "preview close");
   const { environments } = useEnvironments();
+  const judeSessions = useJudeSessions();
   const primaryEnvironment = usePrimaryEnvironment();
   const retryEnvironment = useAtomCommand(environmentCatalog.retryNow, { reportFailure: false });
   const environmentById = useMemo(
@@ -1733,6 +1736,14 @@ function ChatViewContent(props: ChatViewProps) {
   ]);
   const activeEnvironment =
     activeThread == null ? null : (environmentById.get(activeThread.environmentId) ?? null);
+  const activeEnvironmentConnectionId =
+    activeEnvironment?.entry.target._tag === "BearerConnectionTarget"
+      ? activeEnvironment.entry.target.connectionId
+      : null;
+  const headerProjectName = PRODUCT_CAPABILITIES.managedProjects
+    ? (judeAppNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
+      activeProject?.title)
+    : activeProject?.title;
   const activeEnvironmentConnectionPhase = activeEnvironment?.connection.phase ?? "available";
   const activeEnvironmentUnavailable =
     activeEnvironment !== null && activeEnvironmentConnectionPhase !== "connected";
@@ -6050,7 +6061,7 @@ function ChatViewContent(props: ChatViewProps) {
             activeThreadTitle={activeThread.title}
             isServerThread={isServerThread}
             changeRequestState={activeThreadPr?.state ?? null}
-            activeProjectName={activeProject?.title}
+            activeProjectName={headerProjectName}
             activeProjectCwd={activeProject?.workspaceRoot ?? null}
             openInCwd={gitCwd}
             activeProjectScripts={activeProject?.scripts}

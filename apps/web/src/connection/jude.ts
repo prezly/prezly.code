@@ -34,6 +34,11 @@ const JudeT3PairingSchema = Schema.Struct({
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
 
+let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
+let judeSessionsSignature = "[]";
+const judeSessionsListeners = new Set<() => void>();
+const judeEnvironmentRefreshListeners = new Set<() => void>();
+
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
 
 const JUDE_APP_NAMES: Readonly<Record<string, string>> = {
@@ -46,6 +51,45 @@ const JUDE_APP_NAMES: Readonly<Record<string, string>> = {
 
 export function formatJudeAppName(project: string): string {
   return JUDE_APP_NAMES[project] ?? project;
+}
+
+export function judeSessionIdFromConnectionId(connectionId: string | null): string | null {
+  return connectionId?.startsWith("jude:") ? connectionId.slice("jude:".length) : null;
+}
+
+export function judeAppNameForConnection(
+  connectionId: string | null,
+  sessions: ReadonlyArray<JudeSession>,
+): string | null {
+  const sessionId = judeSessionIdFromConnectionId(connectionId);
+  const session = sessionId ? sessions.find((candidate) => candidate.id === sessionId) : undefined;
+  return session ? formatJudeAppName(session.project) : null;
+}
+
+export function getJudeSessionsSnapshot(): ReadonlyArray<JudeSession> {
+  return judeSessionsSnapshot;
+}
+
+export function subscribeToJudeSessions(listener: () => void): () => void {
+  judeSessionsListeners.add(listener);
+  return () => judeSessionsListeners.delete(listener);
+}
+
+export function requestJudeEnvironmentRefresh(): void {
+  for (const listener of judeEnvironmentRefreshListeners) listener();
+}
+
+export function subscribeToJudeEnvironmentRefresh(listener: () => void): () => void {
+  judeEnvironmentRefreshListeners.add(listener);
+  return () => judeEnvironmentRefreshListeners.delete(listener);
+}
+
+function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
+  const signature = JSON.stringify(sessions);
+  if (signature === judeSessionsSignature) return;
+  judeSessionsSignature = signature;
+  judeSessionsSnapshot = sessions;
+  for (const listener of judeSessionsListeners) listener();
 }
 
 export function judeSessionDetailUrl(judeBaseUrl: string, sessionId: string): string {
@@ -94,8 +138,14 @@ export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
   const response = yield* Schema.decodeUnknownEffect(JudeSessionsResponseSchema)(body).pipe(
     Effect.mapError((cause) => discoveryError("session discovery", cause)),
   );
+  publishJudeSessions(response.sessions);
   return response.sessions;
 });
+
+export function refreshJudeEnvironments(): Promise<ReadonlyArray<JudeSession>> {
+  requestJudeEnvironmentRefresh();
+  return Effect.runPromise(listJudeSessions());
+}
 
 export const issueJudeT3Pairing = Effect.fn("web.jude.issueT3Pairing")(function* (
   sessionId: string,

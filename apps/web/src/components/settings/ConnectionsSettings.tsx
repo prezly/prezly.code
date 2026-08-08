@@ -141,9 +141,10 @@ import { PRODUCT_PROFILE } from "~/branding";
 import {
   formatJudeAppName,
   judeSessionDetailUrl,
-  listJudeSessions,
-  type JudeSession,
+  judeSessionIdFromConnectionId,
+  refreshJudeEnvironments,
 } from "~/connection/jude";
+import { useJudeSessions } from "~/hooks/useJudeSessions";
 
 const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 const EMPTY_ADVERTISED_ENDPOINTS: ReadonlyArray<AdvertisedEndpoint> = [];
@@ -3451,20 +3452,23 @@ function StandardConnectionsSettings() {
 
 function ManagedJudeConnectionsSettings() {
   const { environments } = useEnvironments();
-  const [sessions, setSessions] = useState<ReadonlyArray<JudeSession>>([]);
+  const sessions = useJudeSessions();
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const judeBaseUrl = PRODUCT_PROFILE.judeBaseUrl;
 
-  useEffect(() => {
-    let active = true;
-    void Effect.runPromise(listJudeSessions()).then(
-      (nextSessions) => {
-        if (active) setSessions(nextSessions);
-      },
-      () => undefined,
-    );
-    return () => {
-      active = false;
-    };
+  const refresh = useCallback(async () => {
+    setIsRefreshing(true);
+    try {
+      await refreshJudeEnvironments();
+    } catch (error) {
+      toastManager.add({
+        type: "error",
+        title: "Could not refresh Jude environments",
+        description: error instanceof Error ? error.message : "An error occurred.",
+      });
+    } finally {
+      setIsRefreshing(false);
+    }
   }, []);
 
   const sessionById = useMemo(
@@ -3474,7 +3478,20 @@ function ManagedJudeConnectionsSettings() {
 
   return (
     <SettingsPageContainer>
-      <SettingsSection title="Jude environments">
+      <SettingsSection
+        title="Jude environments"
+        headerAction={
+          <Button
+            size="xs"
+            variant="outline"
+            disabled={isRefreshing}
+            onClick={() => void refresh()}
+          >
+            <RefreshCwIcon className={cn("size-3", isRefreshing && "animate-spin")} />
+            {isRefreshing ? "Refreshing…" : "Refresh"}
+          </Button>
+        }
+      >
         {environments.length === 0 ? (
           <SettingsRow
             title="Waiting for environments"
@@ -3486,9 +3503,7 @@ function ManagedJudeConnectionsSettings() {
               environment.entry.target._tag === "BearerConnectionTarget"
                 ? environment.entry.target.connectionId
                 : null;
-            const sessionId = connectionId?.startsWith("jude:")
-              ? connectionId.slice("jude:".length)
-              : null;
+            const sessionId = judeSessionIdFromConnectionId(connectionId);
             const session = sessionId ? sessionById.get(sessionId) : undefined;
             const status = connectionStatusText(environment.connection);
             return (

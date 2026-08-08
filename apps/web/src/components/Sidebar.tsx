@@ -47,6 +47,7 @@ import {
   MessageSquareIcon,
   PinIcon,
   PlusIcon,
+  RefreshCwIcon,
   SearchIcon,
   ServerIcon,
   SquarePenIcon,
@@ -106,6 +107,7 @@ import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES } from "../branding";
+import { refreshJudeEnvironments } from "../connection/jude";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -1429,6 +1431,21 @@ export default function Sidebar() {
     null,
   );
   const [projectScopeMenuOpen, setProjectScopeMenuOpen] = useState(false);
+  const [isRefreshingJude, setIsRefreshingJude] = useState(false);
+  const handleRefreshJude = useCallback(async () => {
+    setIsRefreshingJude(true);
+    try {
+      await refreshJudeEnvironments();
+    } catch (error) {
+      toastManager.add({
+        type: "error",
+        title: "Could not refresh Jude environments",
+        description: error instanceof Error ? error.message : "An error occurred.",
+      });
+    } finally {
+      setIsRefreshingJude(false);
+    }
+  }, []);
   const newThreadContext = useHandleNewThread();
   const openAddProjectCommandPalette = useCallback(() => {
     if (PRODUCT_CAPABILITIES.allowProjectManagement) {
@@ -3198,6 +3215,29 @@ export default function Sidebar() {
                       />
                     </TooltipTrigger>
                     <TooltipPopup side="right">New project</TooltipPopup>
+                  </Tooltip>
+                ) : null}
+                {PRODUCT_CAPABILITIES.managedProjects ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <SidebarMenuButton
+                          size="icon"
+                          type="button"
+                          className="shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                          aria-label="Refresh Jude environments"
+                          disabled={isRefreshingJude}
+                          onClick={() => void handleRefreshJude()}
+                        />
+                      }
+                    >
+                      <RefreshCwIcon className={cn("size-4", isRefreshingJude && "animate-spin")} />
+                    </TooltipTrigger>
+                    <TooltipPopup side="right">
+                      {isRefreshingJude
+                        ? "Refreshing Jude environments…"
+                        : "Refresh Jude environments"}
+                    </TooltipPopup>
                   </Tooltip>
                 ) : null}
               </div>

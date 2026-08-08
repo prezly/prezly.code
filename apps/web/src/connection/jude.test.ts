@@ -6,8 +6,12 @@ import { describe, expect, it, vi } from "vite-plus/test";
 import {
   formatJudeAppName,
   issueJudeT3Pairing,
+  judeAppNameForConnection,
   judeSessionDetailUrl,
+  judeSessionIdFromConnectionId,
   listJudeSessions,
+  requestJudeEnvironmentRefresh,
+  subscribeToJudeEnvironmentRefresh,
 } from "./jude.ts";
 
 describe("Jude discovery", () => {
@@ -17,6 +21,35 @@ describe("Jude discovery", () => {
     expect(judeSessionDetailUrl("https://jude.prezly.net", "admin/fix")).toBe(
       "https://jude.prezly.net/session/admin%2Ffix",
     );
+  });
+
+  it("resolves the Jude app for an environment connection", () => {
+    const sessions = [
+      {
+        id: "admin-fix-search",
+        name: "Fix search",
+        prompt: "Fix search",
+        project: "admin-v2",
+        status: "ready" as const,
+        urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
+      },
+    ];
+
+    expect(judeSessionIdFromConnectionId("jude:admin-fix-search")).toBe("admin-fix-search");
+    expect(judeAppNameForConnection("jude:admin-fix-search", sessions)).toBe("Admin v2");
+    expect(judeAppNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
+  });
+
+  it("notifies the platform when a manual refresh is requested", () => {
+    const listener = vi.fn();
+    const unsubscribe = subscribeToJudeEnvironmentRefresh(listener);
+
+    requestJudeEnvironmentRefresh();
+    expect(listener).toHaveBeenCalledOnce();
+
+    unsubscribe();
+    requestJudeEnvironmentRefresh();
+    expect(listener).toHaveBeenCalledOnce();
   });
 
   it("reads the authoritative session list", async () => {
