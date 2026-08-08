@@ -11,6 +11,7 @@ import {
   getVisibleThreadsForProject,
   getProjectSortTimestamp,
   hasUnseenCompletion,
+  isManagedPlaceholderThread,
   isContextMenuPointerDown,
   isTrailingDoubleClick,
   orderItemsByPreferredIds,
@@ -50,6 +51,46 @@ import {
 } from "../types";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+describe("managed placeholder threads", () => {
+  const placeholder = {
+    title: "New thread",
+    latestTurn: null,
+    latestUserMessageAt: null,
+    session: null,
+    hasPendingApprovals: false,
+    hasPendingUserInput: false,
+    hasActionableProposedPlan: false,
+  };
+
+  it("identifies untouched bootstrap threads", () => {
+    expect(isManagedPlaceholderThread(placeholder)).toBe(true);
+  });
+
+  it("keeps a thread as soon as it has real activity", () => {
+    expect(
+      isManagedPlaceholderThread({
+        ...placeholder,
+        latestUserMessageAt: "2026-08-08T13:00:00.000Z",
+      }),
+    ).toBe(false);
+    expect(
+      isManagedPlaceholderThread({
+        ...placeholder,
+        session: {
+          threadId: ThreadId.make("thread-1"),
+          status: "ready",
+          providerName: "codex",
+          providerInstanceId: ProviderInstanceId.make("codex"),
+          runtimeMode: "full-access",
+          activeTurnId: null,
+          lastError: null,
+          updatedAt: "2026-08-08T13:00:00.000Z",
+        },
+      }),
+    ).toBe(false);
+  });
+});
 
 describe("shouldNavigateAfterProjectRemoval", () => {
   const projectThreads = [{ environmentId: "environment-local", id: "thread-1" }];

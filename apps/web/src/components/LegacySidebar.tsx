@@ -173,6 +173,7 @@ import {
   archiveSelectedThreadEntries,
   buildMultiSelectThreadContextMenuItems,
   getSidebarThreadIdsToPrewarm,
+  isManagedPlaceholderThread,
   resolveAdjacentThreadId,
   isContextMenuPointerDown,
   isTrailingDoubleClick,
@@ -3137,6 +3138,12 @@ export default function LegacySidebar() {
   const threadsByProjectKey = useMemo(() => {
     const next = new Map<string, SidebarThreadSummary[]>();
     for (const thread of sidebarThreads) {
+      if (
+        thread.archivedAt !== null ||
+        (PRODUCT_CAPABILITIES.managedProjects && isManagedPlaceholderThread(thread))
+      ) {
+        continue;
+      }
       const physicalKey =
         projectPhysicalKeyByScopedRef.get(
           scopedProjectKey(scopeProjectRef(thread.environmentId, thread.projectId)),
@@ -3259,7 +3266,12 @@ export default function LegacySidebar() {
   }, []);
 
   const visibleThreads = useMemo(
-    () => sidebarThreads.filter((thread) => thread.archivedAt === null),
+    () =>
+      sidebarThreads.filter(
+        (thread) =>
+          thread.archivedAt === null &&
+          (!PRODUCT_CAPABILITIES.managedProjects || !isManagedPlaceholderThread(thread)),
+      ),
     [sidebarThreads],
   );
   const sortedProjects = useMemo(() => {

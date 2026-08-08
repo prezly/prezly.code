@@ -23,6 +23,29 @@ export const THREAD_JUMP_HINT_SHOW_DELAY_MS = 100;
 // it small; cold opens still render instantly from the cached snapshot.
 export const SIDEBAR_THREAD_PREWARM_LIMIT = 3;
 
+export function isManagedPlaceholderThread(
+  thread: Pick<
+    SidebarThreadSummary,
+    | "title"
+    | "latestTurn"
+    | "latestUserMessageAt"
+    | "session"
+    | "hasPendingApprovals"
+    | "hasPendingUserInput"
+    | "hasActionableProposedPlan"
+  >,
+): boolean {
+  return (
+    thread.title === "New thread" &&
+    thread.latestTurn === null &&
+    thread.latestUserMessageAt == null &&
+    thread.session === null &&
+    !thread.hasPendingApprovals &&
+    !thread.hasPendingUserInput &&
+    !thread.hasActionableProposedPlan
+  );
+}
+
 type SidebarProject = {
   id: string;
   title: string;
