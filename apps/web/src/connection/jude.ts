@@ -96,6 +96,14 @@ export function judeSessionDetailUrl(judeBaseUrl: string, sessionId: string): st
   return new URL(`/session/${encodeURIComponent(sessionId)}`, judeBaseUrl).toString();
 }
 
+export function judeSessionDetailUrlForConnection(
+  judeBaseUrl: string,
+  connectionId: string | null,
+): string | null {
+  const sessionId = judeSessionIdFromConnectionId(connectionId);
+  return sessionId ? judeSessionDetailUrl(judeBaseUrl, sessionId) : null;
+}
+
 function discoveryError(operation: string, cause: unknown) {
   const detail = cause instanceof Error ? cause.message : String(cause);
   return new ConnectionTransientError({

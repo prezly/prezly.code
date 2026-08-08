@@ -107,7 +107,7 @@ import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
-import { refreshJudeEnvironments } from "../connection/jude";
+import { judeSessionDetailUrlForConnection, refreshJudeEnvironments } from "../connection/jude";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -1493,6 +1493,20 @@ export default function Sidebar() {
       ),
     [environments],
   );
+  const judeSessionUrlByEnvironmentId = useMemo(() => {
+    const judeBaseUrl = PRODUCT_PROFILE.judeBaseUrl;
+    if (!judeBaseUrl) return new Map();
+    return new Map(
+      environments.flatMap((environment) => {
+        const connectionId =
+          environment.entry.target._tag === "BearerConnectionTarget"
+            ? environment.entry.target.connectionId
+            : null;
+        const url = judeSessionDetailUrlForConnection(judeBaseUrl, connectionId);
+        return url ? ([[environment.environmentId, url]] as const) : [];
+      }),
+    );
+  }, [environments]);
   const orderedProjects = useMemo(
     () =>
       orderItemsByPreferredIds({
@@ -2753,6 +2767,7 @@ export default function Sidebar() {
         }
         const thread = threadByKeyRef.current.get(threadKey);
         if (!thread) return;
+        const judeSessionUrl = judeSessionUrlByEnvironmentId.get(thread.environmentId) ?? null;
         const threadWorkspacePath =
           thread.worktreePath ??
           projectCwdByKey.get(`${thread.environmentId}:${thread.projectId}`) ??
@@ -2791,7 +2806,7 @@ export default function Sidebar() {
                 snooze: supportsSnooze,
                 pinning: supportsPinning,
                 titleRegeneration: supportsTitleRegeneration,
-                judeLink: PRODUCT_PROFILE.judeBaseUrl !== null,
+                judeLink: judeSessionUrl !== null,
               },
               snoozePresets,
             }),
@@ -2889,8 +2904,8 @@ export default function Sidebar() {
             return;
           case "open-jude":
             try {
-              if (PRODUCT_PROFILE.judeBaseUrl) {
-                await api.shell.openExternal(PRODUCT_PROFILE.judeBaseUrl);
+              if (judeSessionUrl) {
+                await api.shell.openExternal(judeSessionUrl);
               }
             } catch (error) {
               toastManager.add({
@@ -2944,6 +2959,7 @@ export default function Sidebar() {
       deleteThread,
       handleMultiSelectContextMenu,
       handleRefreshJude,
+      judeSessionUrlByEnvironmentId,
       markThreadUnread,
       projectCwdByKey,
       serverConfigs,

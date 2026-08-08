@@ -8,6 +8,7 @@ import {
   issueJudeT3Pairing,
   judeAppNameForConnection,
   judeSessionDetailUrl,
+  judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
   listJudeSessions,
   requestJudeEnvironmentRefresh,
@@ -21,6 +22,12 @@ describe("Jude discovery", () => {
     expect(judeSessionDetailUrl("https://jude.prezly.net", "admin/fix")).toBe(
       "https://jude.prezly.net/session/admin%2Ffix",
     );
+    expect(
+      judeSessionDetailUrlForConnection("https://jude.prezly.net", "jude:website-t3websie"),
+    ).toBe("https://jude.prezly.net/session/website-t3websie");
+    expect(
+      judeSessionDetailUrlForConnection("https://jude.prezly.net", "remote:website-t3websie"),
+    ).toBeNull();
   });
 
   it("resolves the Jude app for an environment connection", () => {
