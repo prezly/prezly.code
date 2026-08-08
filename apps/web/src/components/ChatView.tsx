@@ -2040,6 +2040,7 @@ function ChatViewContent(props: ChatViewProps) {
       }
     }
     if (
+      !PRODUCT_CAPABILITIES.managedProjects &&
       serverUpdateEnvironmentId &&
       !reconnectingThroughVersionSkew &&
       (serverUpdateState.status !== "idle" ||
