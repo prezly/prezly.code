@@ -126,10 +126,15 @@ import {
 } from "~/state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
 import { serverEnvironment } from "~/state/server";
-import { ConnectionStatusDot } from "../ConnectionStatusDot";
+import {
+  ConnectionStatusDot,
+  connectionPhaseDotClassName,
+  connectionPhasePingClassName,
+} from "../ConnectionStatusDot";
 import { ServerUpdateAction, ServerUpdateProgress } from "../ServerUpdateAction";
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
 import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
+import { PRODUCT_CAPABILITIES } from "~/branding";
 
 const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 const EMPTY_ADVERTISED_ENDPOINTS: ReadonlyArray<AdvertisedEndpoint> = [];
@@ -1724,7 +1729,7 @@ function CloudRemoteEnvironmentRows({
   ) : null;
 }
 
-export function ConnectionsSettings() {
+function StandardConnectionsSettings() {
   const desktopBridge = window.desktopBridge;
   const { environments } = useEnvironments();
   const primaryEnvironment = usePrimaryEnvironment();
@@ -3432,5 +3437,45 @@ export function ConnectionsSettings() {
         />
       </SettingsSection>
     </SettingsPageContainer>
+  );
+}
+
+function ManagedJudeConnectionsSettings() {
+  const { environments } = useEnvironments();
+
+  return (
+    <SettingsPageContainer>
+      <SettingsSection title="Jude environments">
+        {environments.length === 0 ? (
+          <SettingsRow
+            title="Waiting for environments"
+            description="Ready Jude environments appear automatically while you are connected to Warp."
+          />
+        ) : (
+          environments.map((environment) => (
+            <SettingsRow
+              key={environment.environmentId}
+              title={environment.label}
+              description={connectionStatusText(environment.connection)}
+              control={
+                <ConnectionStatusDot
+                  tooltipText={connectionStatusText(environment.connection)}
+                  dotClassName={connectionPhaseDotClassName(environment.connection.phase)}
+                  pingClassName={connectionPhasePingClassName(environment.connection.phase)}
+                />
+              }
+            />
+          ))
+        )}
+      </SettingsSection>
+    </SettingsPageContainer>
+  );
+}
+
+export function ConnectionsSettings() {
+  return PRODUCT_CAPABILITIES.allowManualConnections ? (
+    <StandardConnectionsSettings />
+  ) : (
+    <ManagedJudeConnectionsSettings />
   );
 }

@@ -142,6 +142,7 @@ import {
   buildSidebarProjectSnapshots,
 } from "../sidebarProjectGrouping";
 import type { Project } from "../types";
+import { PRODUCT_CAPABILITIES } from "../branding";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 
@@ -1324,7 +1325,9 @@ function OpenCommandPaletteDialog(props: {
       return;
     }
     clearOpenIntent();
-    openAddProjectFlow();
+    if (PRODUCT_CAPABILITIES.allowProjectManagement) {
+      openAddProjectFlow();
+    }
   }, [clearOpenIntent, openAddProjectFlow, openIntent]);
 
   useLayoutEffect(() => {
@@ -1433,37 +1436,39 @@ function OpenCommandPaletteDialog(props: {
     },
   });
 
-  actionItems.push({
-    kind: "action",
-    value: "action:add-project",
-    searchTerms: [
-      "add project",
-      "folder",
-      "directory",
-      "browse",
-      "clone",
-      "remote",
-      "repository",
-      "repo",
-      "git",
-      "github",
-      "gitlab",
-      "bitbucket",
-      "azure",
-      "devops",
-      "url",
-      "environment",
-    ],
-    title: "Add project",
-    disabled: defaultAddProjectEnvironmentId === null,
-    icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
-    keepOpen: true,
-    run: async () => {
-      openAddProjectFlow();
-    },
-  });
+  if (PRODUCT_CAPABILITIES.allowProjectManagement) {
+    actionItems.push({
+      kind: "action",
+      value: "action:add-project",
+      searchTerms: [
+        "add project",
+        "folder",
+        "directory",
+        "browse",
+        "clone",
+        "remote",
+        "repository",
+        "repo",
+        "git",
+        "github",
+        "gitlab",
+        "bitbucket",
+        "azure",
+        "devops",
+        "url",
+        "environment",
+      ],
+      title: "Add project",
+      disabled: defaultAddProjectEnvironmentId === null,
+      icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
+      keepOpen: true,
+      run: async () => {
+        openAddProjectFlow();
+      },
+    });
+  }
 
-  if (wslAddProjectEnvironmentOption) {
+  if (PRODUCT_CAPABILITIES.allowProjectManagement && wslAddProjectEnvironmentOption) {
     actionItems.push({
       kind: "action",
       value: "action:add-project:wsl-folder",

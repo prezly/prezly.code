@@ -105,6 +105,7 @@ import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
+import { PRODUCT_CAPABILITIES } from "../branding";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
@@ -1428,10 +1429,11 @@ export default function Sidebar() {
   );
   const [projectScopeMenuOpen, setProjectScopeMenuOpen] = useState(false);
   const newThreadContext = useHandleNewThread();
-  const openAddProjectCommandPalette = useCallback(
-    () => openCommandPalette({ open: "add-project" }),
-    [],
-  );
+  const openAddProjectCommandPalette = useCallback(() => {
+    if (PRODUCT_CAPABILITIES.allowProjectManagement) {
+      openCommandPalette({ open: "add-project" });
+    }
+  }, []);
   const { environments } = useEnvironments();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
@@ -3154,44 +3156,48 @@ export default function Sidebar() {
                               className="size-4 shrink-0"
                             />
                             <span className="min-w-0 truncate text-sm">{project.displayName}</span>
-                            <button
-                              type="button"
-                              aria-label={`Project actions for ${project.displayName}`}
-                              title={`Project actions for ${project.displayName}`}
-                              className="ml-auto inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-icon-muted outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
-                              onPointerDown={(event) => event.stopPropagation()}
-                              onClick={(event) => {
-                                void handleProjectActions(event, project);
-                              }}
-                            >
-                              <EllipsisIcon className="size-3.5" />
-                            </button>
+                            {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                              <button
+                                type="button"
+                                aria-label={`Project actions for ${project.displayName}`}
+                                title={`Project actions for ${project.displayName}`}
+                                className="ml-auto inline-flex size-6 shrink-0 cursor-pointer items-center justify-center rounded-md text-icon-muted outline-none transition-colors hover:bg-accent hover:text-foreground focus-visible:bg-accent focus-visible:text-foreground focus-visible:ring-2 focus-visible:ring-ring"
+                                onPointerDown={(event) => event.stopPropagation()}
+                                onClick={(event) => {
+                                  void handleProjectActions(event, project);
+                                }}
+                              >
+                                <EllipsisIcon className="size-3.5" />
+                              </button>
+                            ) : null}
                           </MenuRadioItem>
                         );
                       })}
                     </MenuRadioGroup>
                   </MenuPopup>
                 </Menu>
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <SidebarMenuButton
-                        size="icon"
-                        className="relative shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                        onClick={openAddProjectCommandPalette}
-                        type="button"
-                        aria-label="New project"
+                {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                  <Tooltip>
+                    <TooltipTrigger
+                      render={
+                        <SidebarMenuButton
+                          size="icon"
+                          className="relative shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                          onClick={openAddProjectCommandPalette}
+                          type="button"
+                          aria-label="New project"
+                        />
+                      }
+                    >
+                      <FolderPlusIcon />
+                      <span
+                        className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
+                        aria-hidden="true"
                       />
-                    }
-                  >
-                    <FolderPlusIcon />
-                    <span
-                      className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-                      aria-hidden="true"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="right">New project</TooltipPopup>
-                </Tooltip>
+                    </TooltipTrigger>
+                    <TooltipPopup side="right">New project</TooltipPopup>
+                  </Tooltip>
+                ) : null}
               </div>
             ) : null}
           </SidebarGroup>
@@ -3502,15 +3508,21 @@ export default function Sidebar() {
             <div className="flex flex-col items-center gap-2 px-2 py-6 text-center text-xs text-muted-foreground/60">
               {projects.length === 0 ? (
                 <>
-                  <span>No projects yet</span>
-                  <button
-                    type="button"
-                    onClick={openAddProjectCommandPalette}
-                    className="inline-flex items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-[11px] font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
-                  >
-                    <PlusIcon className="-mx-0.5 size-3" />
-                    Add project
-                  </button>
+                  <span>
+                    {PRODUCT_CAPABILITIES.managedProjects
+                      ? "Waiting for Jude environments"
+                      : "No projects yet"}
+                  </span>
+                  {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                    <button
+                      type="button"
+                      onClick={openAddProjectCommandPalette}
+                      className="inline-flex items-center gap-1.5 rounded-md border border-sidebar-border px-2.5 py-1 text-[11px] font-medium text-sidebar-muted-foreground transition-colors hover:bg-sidebar-row-hover hover:text-sidebar-foreground"
+                    >
+                      <PlusIcon className="-mx-0.5 size-3" />
+                      Add project
+                    </button>
+                  ) : null}
                 </>
               ) : scopedProjectGroup ? (
                 `No threads in ${scopedProjectGroup.displayName} yet`

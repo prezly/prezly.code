@@ -9,6 +9,7 @@ import {
   usePullRequestResolution,
 } from "~/lib/sourceControlActions";
 import { cn } from "~/lib/utils";
+import { PRODUCT_CAPABILITIES } from "~/branding";
 import { parsePullRequestReference } from "~/pullRequestReference";
 import { getSourceControlPresentation } from "~/sourceControlPresentation";
 import { useEnvironmentQuery } from "~/state/query";
@@ -202,7 +203,10 @@ export function PullRequestThreadDialog({
           </DialogTitle>
           <DialogDescription>
             Resolve a {sourceControlPresentation.providerName} {terminology.singular}, then create
-            the draft thread in the main repo or in a dedicated worktree.
+            the draft thread
+            {PRODUCT_CAPABILITIES.allowWorktreeManagement
+              ? " in the main repo or in a dedicated worktree."
+              : " in the current Jude environment."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel className="space-y-4">
@@ -280,23 +284,29 @@ export function PullRequestThreadDialog({
               preparePullRequestThreadAction.isPending
             }
           >
-            {preparingMode === "local" ? "Preparing local..." : "Local"}
+            {preparingMode === "local"
+              ? "Preparing checkout..."
+              : PRODUCT_CAPABILITIES.allowWorktreeManagement
+                ? "Local"
+                : "Current checkout"}
           </Button>
-          <Button
-            type="button"
-            size="sm"
-            onClick={() => {
-              void handleConfirm("worktree");
-            }}
-            disabled={
-              !cwd ||
-              !resolvedPullRequest ||
-              isResolving ||
-              preparePullRequestThreadAction.isPending
-            }
-          >
-            {preparingMode === "worktree" ? "Preparing worktree..." : "Worktree"}
-          </Button>
+          {PRODUCT_CAPABILITIES.allowWorktreeManagement ? (
+            <Button
+              type="button"
+              size="sm"
+              onClick={() => {
+                void handleConfirm("worktree");
+              }}
+              disabled={
+                !cwd ||
+                !resolvedPullRequest ||
+                isResolving ||
+                preparePullRequestThreadAction.isPending
+              }
+            >
+              {preparingMode === "worktree" ? "Preparing worktree..." : "Worktree"}
+            </Button>
+          ) : null}
         </DialogFooter>
       </DialogPopup>
     </Dialog>

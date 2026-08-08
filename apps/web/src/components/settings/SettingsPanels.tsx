@@ -38,7 +38,12 @@ import { createModelSelection } from "@t3tools/shared/model";
 import * as Duration from "effect/Duration";
 import * as Equal from "effect/Equal";
 import * as Schema from "effect/Schema";
-import { APP_VERSION, HOSTED_APP_CHANNEL, HOSTED_APP_CHANNEL_LABEL } from "../../branding";
+import {
+  APP_VERSION,
+  HOSTED_APP_CHANNEL,
+  HOSTED_APP_CHANNEL_LABEL,
+  PRODUCT_CAPABILITIES,
+} from "../../branding";
 import {
   canCheckForUpdate,
   getDesktopUpdateButtonTooltip,
@@ -1976,52 +1981,55 @@ export function GeneralSettingsPanel() {
           }
         />
 
-        <SettingsRow
-          {...searchableSetting("new-threads")}
-          description="Pick the default workspace mode for newly created draft threads."
-          resetAction={
-            settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode ||
-            settings.newWorktreesStartFromOrigin !==
-              DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin ? (
-              <SettingResetButton
-                label="new threads"
-                onClick={() =>
-                  updateSettings({
-                    defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
-                    newWorktreesStartFromOrigin:
-                      DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
-                  })
-                }
-              />
-            ) : null
-          }
-          control={
-            <Select
-              value={settings.defaultThreadEnvMode}
-              onValueChange={(value) => {
-                if (value === "local" || value === "worktree") {
-                  updateSettings({ defaultThreadEnvMode: value });
-                }
-              }}
-            >
-              <SelectTrigger className="w-full sm:w-44" aria-label="Default thread mode">
-                <SelectValue>
-                  {settings.defaultThreadEnvMode === "worktree" ? "New worktree" : "Local"}
-                </SelectValue>
-              </SelectTrigger>
-              <SelectPopup align="end" alignItemWithTrigger={false}>
-                <SelectItem hideIndicator value="local">
-                  Local
-                </SelectItem>
-                <SelectItem hideIndicator value="worktree">
-                  New worktree
-                </SelectItem>
-              </SelectPopup>
-            </Select>
-          }
-        />
+        {PRODUCT_CAPABILITIES.allowWorktreeManagement ? (
+          <SettingsRow
+            {...searchableSetting("new-threads")}
+            description="Pick the default workspace mode for newly created draft threads."
+            resetAction={
+              settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode ||
+              settings.newWorktreesStartFromOrigin !==
+                DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin ? (
+                <SettingResetButton
+                  label="new threads"
+                  onClick={() =>
+                    updateSettings({
+                      defaultThreadEnvMode: DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode,
+                      newWorktreesStartFromOrigin:
+                        DEFAULT_UNIFIED_SETTINGS.newWorktreesStartFromOrigin,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <Select
+                value={settings.defaultThreadEnvMode}
+                onValueChange={(value) => {
+                  if (value === "local" || value === "worktree") {
+                    updateSettings({ defaultThreadEnvMode: value });
+                  }
+                }}
+              >
+                <SelectTrigger className="w-full sm:w-44" aria-label="Default thread mode">
+                  <SelectValue>
+                    {settings.defaultThreadEnvMode === "worktree" ? "New worktree" : "Local"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup align="end" alignItemWithTrigger={false}>
+                  <SelectItem hideIndicator value="local">
+                    Local
+                  </SelectItem>
+                  <SelectItem hideIndicator value="worktree">
+                    New worktree
+                  </SelectItem>
+                </SelectPopup>
+              </Select>
+            }
+          />
+        ) : null}
 
-        {settings.defaultThreadEnvMode === "worktree" ? (
+        {PRODUCT_CAPABILITIES.allowWorktreeManagement &&
+        settings.defaultThreadEnvMode === "worktree" ? (
           <SettingsRow
             className="bg-muted/20 sm:pl-9"
             title={searchableSetting("start-from-origin").title}
@@ -2052,33 +2060,35 @@ export function GeneralSettingsPanel() {
           />
         ) : null}
 
-        <SettingsRow
-          {...searchableSetting("add-project-starts-in")}
-          description='Leave empty to use "~/" when the Add Project browser opens.'
-          resetAction={
-            settings.addProjectBaseDirectory !==
-            DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
-              <SettingResetButton
-                label="add project base directory"
-                onClick={() =>
-                  updateSettings({
-                    addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
-                  })
-                }
+        {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+          <SettingsRow
+            {...searchableSetting("add-project-starts-in")}
+            description='Leave empty to use "~/" when the Add Project browser opens.'
+            resetAction={
+              settings.addProjectBaseDirectory !==
+              DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory ? (
+                <SettingResetButton
+                  label="add project base directory"
+                  onClick={() =>
+                    updateSettings({
+                      addProjectBaseDirectory: DEFAULT_UNIFIED_SETTINGS.addProjectBaseDirectory,
+                    })
+                  }
+                />
+              ) : null
+            }
+            control={
+              <DraftInput
+                className="w-full sm:w-72"
+                value={settings.addProjectBaseDirectory}
+                onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
+                placeholder="~/"
+                spellCheck={false}
+                aria-label="Add project base directory"
               />
-            ) : null
-          }
-          control={
-            <DraftInput
-              className="w-full sm:w-72"
-              value={settings.addProjectBaseDirectory}
-              onCommit={(next) => updateSettings({ addProjectBaseDirectory: next })}
-              placeholder="~/"
-              spellCheck={false}
-              aria-label="Add project base directory"
-            />
-          }
-        />
+            }
+          />
+        ) : null}
 
         <SettingsRow
           {...searchableSetting("archive-confirmation")}

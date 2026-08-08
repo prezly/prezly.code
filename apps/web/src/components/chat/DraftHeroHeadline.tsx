@@ -4,6 +4,7 @@ import { FolderPlusIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { openCommandPalette } from "~/commandPaletteBus";
+import { PRODUCT_CAPABILITIES } from "~/branding";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useClientSettings } from "~/hooks/useSettings";
 import { selectProjectGroupingSettings } from "~/logicalProject";
@@ -130,14 +131,18 @@ export function DraftHeroHeadline({
             );
           })}
         </MenuRadioGroup>
-        <MenuSeparator />
-        <MenuItem onClick={openAddProject}>
-          <FolderPlusIcon />
-          New project
-        </MenuItem>
+        {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+          <>
+            <MenuSeparator />
+            <MenuItem onClick={openAddProject}>
+              <FolderPlusIcon />
+              New project
+            </MenuItem>
+          </>
+        ) : null}
       </MenuPopup>
     </Menu>
-  ) : (
+  ) : PRODUCT_CAPABILITIES.allowProjectManagement ? (
     <button
       type="button"
       onClick={openAddProject}
@@ -145,7 +150,7 @@ export function DraftHeroHeadline({
     >
       {activeProjectTitle ?? "Add a project"}
     </button>
-  );
+  ) : null;
 
   return (
     <h1 className="mx-auto w-full max-w-5xl text-center font-normal text-2xl text-foreground tracking-tight sm:text-3xl">
@@ -154,7 +159,11 @@ export function DraftHeroHeadline({
       ) : canChooseProject ? (
         <>{projectSelector} to start</>
       ) : (
-        <>Add a project to start</>
+        <>
+          {PRODUCT_CAPABILITIES.managedProjects
+            ? "Waiting for a Jude environment"
+            : "Add a project to start"}
+        </>
       )}
     </h1>
   );

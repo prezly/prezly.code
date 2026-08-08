@@ -15,7 +15,7 @@ import {
   useThreadShells,
 } from "../state/entities";
 import { useEnvironments } from "../state/environments";
-import { APP_DISPLAY_NAME } from "~/branding";
+import { APP_DISPLAY_NAME, PRODUCT_CAPABILITIES } from "~/branding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { cn } from "~/lib/utils";
 import { COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS } from "~/workspaceTitlebar";
@@ -106,6 +106,7 @@ function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {
 
 function NoProjectsHero() {
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
+  const managedProjects = PRODUCT_CAPABILITIES.managedProjects;
 
   return (
     <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
@@ -117,14 +118,18 @@ function NoProjectsHero() {
                 What should we work on?
               </EmptyTitle>
               <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
-                Add a project to start your first thread.
+                {managedProjects
+                  ? "Jude environments appear here automatically when they are ready."
+                  : "Add a project to start your first thread."}
               </EmptyDescription>
-              <div className="mt-6 flex justify-center">
-                <Button size="sm" onClick={openAddProject}>
-                  <PlusIcon className="size-4" />
-                  Add project
-                </Button>
-              </div>
+              {!managedProjects ? (
+                <div className="mt-6 flex justify-center">
+                  <Button size="sm" onClick={openAddProject}>
+                    <PlusIcon className="size-4" />
+                    Add project
+                  </Button>
+                </div>
+              ) : null}
             </EmptyHeader>
           </div>
         </Empty>

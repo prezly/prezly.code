@@ -26,6 +26,7 @@ import { primaryServerSettingsAtom } from "../state/server";
 import { resolveThreadRouteTarget } from "../threadRoutes";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
 import { useClientSettings } from "./useSettings";
+import { PRODUCT_CAPABILITIES } from "../branding";
 
 export function useNewThreadHandler() {
   const projects = useProjects();
@@ -109,9 +110,12 @@ export function useNewThreadHandler() {
         ? deriveLogicalProjectKeyFromSettings(project, projectGroupingSettings)
         : scopedProjectKey(projectRef);
       const hasBranchOption = options?.branch !== undefined;
-      const hasWorktreePathOption = options?.worktreePath !== undefined;
-      const hasEnvModeOption = options?.envMode !== undefined;
-      const hasStartFromOriginOption = options?.startFromOrigin !== undefined;
+      const hasWorktreePathOption =
+        PRODUCT_CAPABILITIES.allowWorktreeManagement && options?.worktreePath !== undefined;
+      const hasEnvModeOption =
+        PRODUCT_CAPABILITIES.allowWorktreeManagement && options?.envMode !== undefined;
+      const hasStartFromOriginOption =
+        PRODUCT_CAPABILITIES.allowWorktreeManagement && options?.startFromOrigin !== undefined;
       const storedDraftThread = getDraftSessionByLogicalProjectKey(logicalProjectKey);
       const storedDraftThreadRef = storedDraftThread
         ? scopeThreadRef(storedDraftThread.environmentId, storedDraftThread.threadId)
@@ -146,7 +150,9 @@ export function useNewThreadHandler() {
           // preserved. When the draft is already open and no options were
           // passed, leave it alone entirely — the user may have just picked a
           // branch in the composer.
-          const defaultEnvMode = primaryServerSettings.defaultThreadEnvMode;
+          const defaultEnvMode = PRODUCT_CAPABILITIES.allowWorktreeManagement
+            ? primaryServerSettings.defaultThreadEnvMode
+            : "local";
           const workspaceContext = hasExplicitWorkspaceOption
             ? {
                 ...(hasBranchOption ? { branch: options?.branch ?? null } : {}),
@@ -244,7 +250,9 @@ export function useNewThreadHandler() {
       const draftId = newDraftId();
       const threadId = newThreadId();
       const createdAt = new Date().toISOString();
-      const initialEnvMode = options?.envMode ?? primaryServerSettings.defaultThreadEnvMode;
+      const initialEnvMode = PRODUCT_CAPABILITIES.allowWorktreeManagement
+        ? (options?.envMode ?? primaryServerSettings.defaultThreadEnvMode)
+        : "local";
       return (async () => {
         setLogicalProjectDraftThreadId(logicalProjectKey, projectRef, draftId, {
           threadId,

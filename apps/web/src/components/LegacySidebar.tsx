@@ -108,6 +108,7 @@ import { readLocalApi } from "../localApi";
 import { useComposerDraftStore } from "../composerDraftStore";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { useDesktopUpdateState } from "../state/desktopUpdate";
+import { PRODUCT_CAPABILITIES } from "../branding";
 
 import { useThreadActions } from "../hooks/useThreadActions";
 import { projectEnvironment } from "../state/projects";
@@ -2883,22 +2884,24 @@ const SidebarProjectsContent = memo(function SidebarProjectsContent(
               onThreadSortOrderChange={handleThreadSortOrderChange}
               onThreadPreviewCountChange={handleThreadPreviewCountChange}
             />
-            <Tooltip>
-              <TooltipTrigger
-                render={
-                  <button
-                    type="button"
-                    aria-label="Add project"
-                    data-testid="sidebar-add-project-trigger"
-                    className="inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-md px-[calc(--spacing(1)-1px)] text-icon-muted transition-colors hover:bg-accent hover:text-foreground"
-                    onClick={openAddProject}
-                  />
-                }
-              >
-                <FolderPlusIcon className="size-3.5" />
-              </TooltipTrigger>
-              <TooltipPopup side="right">Add project</TooltipPopup>
-            </Tooltip>
+            {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+              <Tooltip>
+                <TooltipTrigger
+                  render={
+                    <button
+                      type="button"
+                      aria-label="Add project"
+                      data-testid="sidebar-add-project-trigger"
+                      className="inline-flex h-6 min-w-6 cursor-pointer items-center justify-center rounded-md px-[calc(--spacing(1)-1px)] text-icon-muted transition-colors hover:bg-accent hover:text-foreground"
+                      onClick={openAddProject}
+                    />
+                  }
+                >
+                  <FolderPlusIcon className="size-3.5" />
+                </TooltipTrigger>
+                <TooltipPopup side="right">Add project</TooltipPopup>
+              </Tooltip>
+            ) : null}
           </div>
         </div>
 
@@ -3016,10 +3019,11 @@ export default function LegacySidebar() {
       : false,
   );
   const keybindings = useAtomValue(primaryServerKeybindingsAtom);
-  const openAddProjectCommandPalette = useCallback(
-    () => openCommandPalette({ open: "add-project" }),
-    [],
-  );
+  const openAddProjectCommandPalette = useCallback(() => {
+    if (PRODUCT_CAPABILITIES.allowProjectManagement) {
+      openCommandPalette({ open: "add-project" });
+    }
+  }, []);
   const [expandedThreadListsByProject, setExpandedThreadListsByProject] = useState<
     ReadonlySet<string>
   >(() => new Set());

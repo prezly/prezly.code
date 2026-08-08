@@ -120,6 +120,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
+import { PRODUCT_CAPABILITIES } from "../branding";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
 import {
@@ -3986,15 +3987,18 @@ function ChatViewContent(props: ChatViewProps) {
     draftThreadEnvMode: isLocalDraftThread ? draftThread?.envMode : undefined,
   });
   const canOverrideServerThreadEnvMode = Boolean(
+    PRODUCT_CAPABILITIES.allowWorktreeManagement &&
     isServerThread &&
     activeThread &&
     activeThread.messages.length === 0 &&
     activeThread.worktreePath === null &&
     !envLocked,
   );
-  const envMode: DraftThreadEnvMode = canOverrideServerThreadEnvMode
-    ? (pendingServerThreadEnvMode ?? draftThread?.envMode ?? derivedEnvMode)
-    : derivedEnvMode;
+  const envMode: DraftThreadEnvMode = PRODUCT_CAPABILITIES.allowWorktreeManagement
+    ? canOverrideServerThreadEnvMode
+      ? (pendingServerThreadEnvMode ?? draftThread?.envMode ?? derivedEnvMode)
+      : derivedEnvMode
+    : "local";
   const activeThreadBranch =
     canOverrideServerThreadEnvMode && pendingServerThreadBranch !== undefined
       ? pendingServerThreadBranch
@@ -5829,6 +5833,10 @@ function ChatViewContent(props: ChatViewProps) {
   );
   const onEnvModeChange = useCallback(
     (mode: DraftThreadEnvMode) => {
+      if (!PRODUCT_CAPABILITIES.allowWorktreeManagement) {
+        scheduleComposerFocus();
+        return;
+      }
       if (canOverrideServerThreadEnvMode) {
         setPendingServerThreadEnvMode(mode);
         scheduleComposerFocus();
