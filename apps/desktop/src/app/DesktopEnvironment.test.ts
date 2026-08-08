@@ -112,6 +112,10 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.appUserModelId, "com.prezly.p3code");
       assert.equal(environment.linuxDesktopEntryName, "p3code.desktop");
       assert.equal(environment.linuxWmClass, "p3code");
+      assert.equal(
+        environment.developmentDockIconPath,
+        "/repo/assets/p3/prezly-code-macos-1024.png",
+      );
       assert.isFalse(environment.productProfile.capabilities.allowLocalEnvironment);
       assert.isFalse(environment.productProfile.capabilities.allowWorktreeManagement);
       assert.equal(environment.productProfile.capabilities.fixedWorkspaceRoot, "/source");

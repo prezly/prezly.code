@@ -275,7 +275,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
       path.join(resourcesPath, "resources", fileName),
       path.join(resourcesPath, fileName),
     ],
-    developmentDockIconPath: path.join(rootDir, "assets", "dev", "blueprint-macos-1024.png"),
+    developmentDockIconPath: path.join(
+      rootDir,
+      productProfile.id === "p3"
+        ? "assets/p3/prezly-code-macos-1024.png"
+        : "assets/dev/blueprint-macos-1024.png",
+    ),
   });
 });
 
