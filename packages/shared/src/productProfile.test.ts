@@ -24,6 +24,7 @@ describe("resolveProductProfile", () => {
         allowLocalEnvironment: false,
         allowManualConnections: false,
         allowProjectManagement: false,
+        allowUsageInsights: false,
         allowWorktreeManagement: false,
         fixedWorkspaceRoot: "/source",
         managedProjects: true,

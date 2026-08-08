@@ -4,6 +4,7 @@ export interface ProductCapabilities {
   readonly allowLocalEnvironment: boolean;
   readonly allowManualConnections: boolean;
   readonly allowProjectManagement: boolean;
+  readonly allowUsageInsights: boolean;
   readonly allowWorktreeManagement: boolean;
   readonly fixedWorkspaceRoot: string | null;
   readonly managedProjects: boolean;
@@ -32,6 +33,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
     allowLocalEnvironment: true,
     allowManualConnections: true,
     allowProjectManagement: true,
+    allowUsageInsights: true,
     allowWorktreeManagement: true,
     fixedWorkspaceRoot: null,
     managedProjects: false,
@@ -54,6 +56,7 @@ const P3_PRODUCT_PROFILE: ProductProfile = {
     allowLocalEnvironment: false,
     allowManualConnections: false,
     allowProjectManagement: false,
+    allowUsageInsights: false,
     allowWorktreeManagement: false,
     fixedWorkspaceRoot: "/source",
     managedProjects: true,

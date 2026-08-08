@@ -2,7 +2,7 @@ import { ChartNoAxesColumnIcon, SettingsIcon } from "lucide-react";
 import { memo, useCallback } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 
-import { APP_BASE_NAME, PRODUCT_PROFILE } from "../../branding";
+import { APP_BASE_NAME, PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../../branding";
 import { useEnvironmentIdentificationMode } from "../../hooks/useSettings";
 import { cn } from "../../lib/utils";
 import {
@@ -137,12 +137,14 @@ export const SidebarChromeFooter = memo(function SidebarChromeFooter() {
       <SidebarProviderUpdatePill />
       <SidebarUpdatePill />
       <SidebarMenu>
-        <SidebarMenuItem>
-          <SidebarMenuButton onClick={handleUsageClick}>
-            <ChartNoAxesColumnIcon />
-            <span>Usage</span>
-          </SidebarMenuButton>
-        </SidebarMenuItem>
+        {PRODUCT_CAPABILITIES.allowUsageInsights ? (
+          <SidebarMenuItem>
+            <SidebarMenuButton onClick={handleUsageClick}>
+              <ChartNoAxesColumnIcon />
+              <span>Usage</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        ) : null}
         <SidebarMenuItem>
           <SidebarMenuButton onClick={handleSettingsClick}>
             <SettingsIcon />

@@ -80,6 +80,7 @@ describe("branding", () => {
     expect(branding.APP_DISPLAY_NAME).toBe("Prezly.code");
     expect(branding.PRODUCT_CAPABILITIES).toMatchObject({
       allowLocalEnvironment: false,
+      allowUsageInsights: false,
       allowWorktreeManagement: false,
       fixedWorkspaceRoot: "/source",
       managedProjects: true,
