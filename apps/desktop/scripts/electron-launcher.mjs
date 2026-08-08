@@ -61,6 +61,42 @@ const launcherMacIconPngPath = NodePath.join(repoRoot, launcherBranding.macIconP
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher script has no Effect runtime.
 const hostPlatform = NodeOS.platform();
 
+export function resolveLocalUserDataDir({
+  appData,
+  development,
+  homeDirectory,
+  platform,
+  stateDirectoryName,
+  xdgConfigHome,
+}) {
+  const directoryName = development ? `${stateDirectoryName}-dev` : stateDirectoryName;
+  switch (platform) {
+    case "darwin":
+      return NodePath.join(homeDirectory, "Library", "Application Support", directoryName);
+    case "win32":
+      return NodePath.join(
+        appData || NodePath.join(homeDirectory, "AppData", "Roaming"),
+        directoryName,
+      );
+    default:
+      return NodePath.join(xdgConfigHome || NodePath.join(homeDirectory, ".config"), directoryName);
+  }
+}
+
+const localUserDataArgs =
+  productProfile.id === "p3"
+    ? [
+        `--user-data-dir=${resolveLocalUserDataDir({
+          appData: process.env.APPDATA,
+          development: isDevelopment,
+          homeDirectory: NodeOS.homedir(),
+          platform: hostPlatform,
+          stateDirectoryName: productProfile.desktop.stateDirectoryName,
+          xdgConfigHome: process.env.XDG_CONFIG_HOME,
+        })}`,
+      ]
+    : [];
+
 function setPlistString(plistPath, key, value) {
   const replaceResult = NodeChildProcess.spawnSync(
     "plutil",
@@ -140,6 +176,7 @@ export function makeDevelopmentLauncherScript({
     ["VITE_DEV_SERVER_URL", environment.VITE_DEV_SERVER_URL],
     ["T3CODE_PORT", environment.T3CODE_PORT],
     ["T3CODE_HOME", environment.T3CODE_HOME],
+    ["P3CODE_HOME", environment.P3CODE_HOME],
     ["T3CODE_COMMIT_HASH", environment.T3CODE_COMMIT_HASH],
     ["T3CODE_OTLP_TRACES_URL", environment.T3CODE_OTLP_TRACES_URL],
     ["T3CODE_OTLP_EXPORT_INTERVAL_MS", environment.T3CODE_OTLP_EXPORT_INTERVAL_MS],
@@ -430,7 +467,7 @@ export function resolveElectronLaunchCommand(args = []) {
   const electronPath = resolveElectronPath();
   return {
     electronPath,
-    args: [...resolveLinuxSandboxArgs(electronPath), ...args],
+    args: [...resolveLinuxSandboxArgs(electronPath), ...localUserDataArgs, ...args],
   };
 }
 

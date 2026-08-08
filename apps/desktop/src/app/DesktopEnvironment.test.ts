@@ -122,6 +122,22 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("keeps P3 state isolated from an ambient T3 home override", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        { productProfileId: "p3" },
+        {
+          T3CODE_HOME: "/shared/t3",
+          P3CODE_HOME: "/isolated/p3",
+        },
+      );
+
+      assert.equal(environment.baseDir, "/isolated/p3");
+      assert.equal(environment.stateDir, "/isolated/p3/userdata");
+      assert.notEqual(environment.baseDir, "/shared/t3");
+    }),
+  );
+
   it.effect("keeps implicit development state separate from production state", () =>
     Effect.gen(function* () {
       const development = yield* makeEnvironment(

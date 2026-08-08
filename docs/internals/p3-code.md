@@ -44,6 +44,12 @@ The profile produces the Prezly.code application name, `com.prezly.p3code` appli
 `p3code` protocol scheme, separate application data, and a renderer-only desktop process without
 a local T3 backend.
 
+Prezly.code keeps all durable state separate from T3 Code. Server and client settings, logs,
+secrets, and cached environment data live below `~/.p3` (or an explicit `P3CODE_HOME`). Electron
+preferences, cookies, IndexedDB, and browser caches use the `p3code` application-data directory and
+the `p3code://` origin. An ambient `T3CODE_HOME` never redirects the P3 profile into T3 Code's state
+directory.
+
 ## Future auth boundary
 
 User authentication and user-scoped environment discovery belong at the Electron Jude proxy.

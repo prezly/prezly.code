@@ -156,11 +156,12 @@ const make = Effect.fn("desktop.environment.make")(function* (
       : input.platform === "darwin"
         ? path.join(homeDirectory, "Library", "Application Support")
         : Option.getOrElse(config.xdgConfigHome, () => path.join(homeDirectory, ".config"));
+  const profileHome = productProfile.id === "p3" ? config.p3Home : config.t3Home;
   const baseDir = resolveDesktopBaseDir({
     defaultDirectoryName: productProfile.desktop.homeDirectoryName,
     homeDirectory,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: profileHome,
   });
   const rootDir = path.resolve(input.dirname, "../../..");
   const appRoot = input.isPackaged ? input.appPath : rootDir;
@@ -174,7 +175,7 @@ const make = Effect.fn("desktop.environment.make")(function* (
     baseDir,
     isDevelopment,
     joinPath: path.join,
-    t3Home: config.t3Home,
+    t3Home: profileHome,
   });
   const userDataDirName = isDevelopment
     ? `${productProfile.desktop.stateDirectoryName}-dev`
