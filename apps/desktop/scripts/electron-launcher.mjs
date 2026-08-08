@@ -6,6 +6,7 @@ import * as NodeModule from "node:module";
 import * as NodeOS from "node:os";
 import * as NodePath from "node:path";
 import * as NodeURL from "node:url";
+import { resolveProductProfile } from "../../../packages/shared/src/productProfile.ts";
 import { ensureElectronRuntime } from "./ensure-electron-runtime.mjs";
 
 const isDevelopment = Boolean(process.env.VITE_DEV_SERVER_URL);
@@ -15,19 +16,46 @@ const repoRoot = NodePath.resolve(desktopDir, "..", "..");
 const devBundleIdSuffix = NodePath.basename(repoRoot)
   .toLowerCase()
   .replaceAll(/[^a-z0-9]+/g, "");
-export const APP_DISPLAY_NAME = isDevelopment ? "T3 Code (Dev)" : "T3 Code (Alpha)";
-export const APP_BUNDLE_ID = isDevelopment
-  ? `com.t3tools.t3code.dev.${devBundleIdSuffix || "local"}`
-  : "com.t3tools.t3code";
-const APP_PROTOCOL_SCHEMES = isDevelopment ? ["t3code-dev"] : ["t3code"];
-const LAUNCHER_VERSION = 14;
+const productProfile = resolveProductProfile(process.env.T3CODE_PRODUCT_PROFILE);
+
+export function resolveLauncherBranding({ development, productProfileId, repoName }) {
+  const profile = resolveProductProfile(productProfileId);
+  if (profile.id === "p3") {
+    return {
+      displayName: profile.baseName,
+      bundleId: development
+        ? `${profile.desktop.appId}.dev.${repoName || "local"}`
+        : profile.desktop.appId,
+      protocolSchemes: development
+        ? [`${profile.desktop.protocolScheme}-dev`]
+        : [profile.desktop.protocolScheme],
+      macIconPngPath: "assets/p3/prezly-code-macos-1024.png",
+    };
+  }
+
+  return {
+    displayName: development ? "T3 Code (Dev)" : "T3 Code (Alpha)",
+    bundleId: development
+      ? `${profile.desktop.appId}.dev.${repoName || "local"}`
+      : profile.desktop.appId,
+    protocolSchemes: development
+      ? [`${profile.desktop.protocolScheme}-dev`]
+      : [profile.desktop.protocolScheme],
+    macIconPngPath: "assets/dev/blueprint-macos-1024.png",
+  };
+}
+
+const launcherBranding = resolveLauncherBranding({
+  development: isDevelopment,
+  productProfileId: productProfile.id,
+  repoName: devBundleIdSuffix,
+});
+export const APP_DISPLAY_NAME = launcherBranding.displayName;
+export const APP_BUNDLE_ID = launcherBranding.bundleId;
+const APP_PROTOCOL_SCHEMES = launcherBranding.protocolSchemes;
+const LAUNCHER_VERSION = 15;
 const defaultIconPath = NodePath.join(desktopDir, "resources", "icon.icns");
-const developmentMacIconPngPath = NodePath.join(
-  repoRoot,
-  "assets",
-  "dev",
-  "blueprint-macos-1024.png",
-);
+const launcherMacIconPngPath = NodePath.join(repoRoot, launcherBranding.macIconPngPath);
 // oxlint-disable-next-line t3code/no-global-process-runtime -- Standalone launcher script has no Effect runtime.
 const hostPlatform = NodeOS.platform();
 
@@ -113,6 +141,7 @@ export function makeDevelopmentLauncherScript({
     ["T3CODE_COMMIT_HASH", environment.T3CODE_COMMIT_HASH],
     ["T3CODE_OTLP_TRACES_URL", environment.T3CODE_OTLP_TRACES_URL],
     ["T3CODE_OTLP_EXPORT_INTERVAL_MS", environment.T3CODE_OTLP_EXPORT_INTERVAL_MS],
+    ["T3CODE_PRODUCT_PROFILE", environment.T3CODE_PRODUCT_PROFILE],
     ["T3CODE_DESKTOP_APP_USER_MODEL_ID", APP_BUNDLE_ID],
   ].filter((entry) => typeof entry[1] === "string" && entry[1].trim().length > 0);
   return [
@@ -165,15 +194,15 @@ function registerMacLauncherBundle(appBundlePath) {
   }
 }
 
-function ensureDevelopmentIconIcns(runtimeDir) {
-  const generatedIconPath = NodePath.join(runtimeDir, "icon-dev.icns");
+function ensureLauncherIconIcns(runtimeDir) {
+  const generatedIconPath = NodePath.join(runtimeDir, `icon-${productProfile.id}.icns`);
   NodeFS.mkdirSync(runtimeDir, { recursive: true });
 
-  if (!NodeFS.existsSync(developmentMacIconPngPath)) {
+  if (!NodeFS.existsSync(launcherMacIconPngPath)) {
     return defaultIconPath;
   }
 
-  const sourceMtimeMs = NodeFS.statSync(developmentMacIconPngPath).mtimeMs;
+  const sourceMtimeMs = NodeFS.statSync(launcherMacIconPngPath).mtimeMs;
   if (
     NodeFS.existsSync(generatedIconPath) &&
     NodeFS.statSync(generatedIconPath).mtimeMs >= sourceMtimeMs
@@ -191,7 +220,7 @@ function ensureDevelopmentIconIcns(runtimeDir) {
         "-z",
         String(size),
         String(size),
-        developmentMacIconPngPath,
+        launcherMacIconPngPath,
         "--out",
         NodePath.join(iconsetDir, `icon_${size}x${size}.png`),
       ]);
@@ -201,7 +230,7 @@ function ensureDevelopmentIconIcns(runtimeDir) {
         "-z",
         String(retinaSize),
         String(retinaSize),
-        developmentMacIconPngPath,
+        launcherMacIconPngPath,
         "--out",
         NodePath.join(iconsetDir, `icon_${size}x${size}@2x.png`),
       ]);
@@ -297,7 +326,10 @@ function buildMacLauncher(electronBinaryPath) {
   const launcherBinaryPath = isDevelopment
     ? developmentPaths.launcherBinaryPath
     : runtimeElectronBinaryPath;
-  const iconPath = isDevelopment ? ensureDevelopmentIconIcns(runtimeDir) : defaultIconPath;
+  const iconPath =
+    isDevelopment || productProfile.id === "p3"
+      ? ensureLauncherIconIcns(runtimeDir)
+      : defaultIconPath;
   const metadataPath = NodePath.join(runtimeDir, "metadata.json");
 
   NodeFS.mkdirSync(runtimeDir, { recursive: true });

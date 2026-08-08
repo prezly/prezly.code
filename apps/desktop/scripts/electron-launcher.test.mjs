@@ -3,10 +3,27 @@ import { assert, describe, it } from "vite-plus/test";
 import {
   makeDevelopmentLauncherScript,
   resolveElectronBinaryPath,
+  resolveLauncherBranding,
   resolveMacLauncherPaths,
 } from "./electron-launcher.mjs";
 
 describe("electron development launcher", () => {
+  it("resolves the Prezly bundle identity and icon", () => {
+    assert.deepEqual(
+      resolveLauncherBranding({
+        development: false,
+        productProfileId: "p3",
+        repoName: "t3code",
+      }),
+      {
+        displayName: "Prezly.code",
+        bundleId: "com.prezly.p3code",
+        protocolSchemes: ["p3code"],
+        macIconPngPath: "assets/p3/prezly-code-macos-1024.png",
+      },
+    );
+  });
+
   it("uses captured values only as fallbacks for a live runner environment", () => {
     const script = makeDevelopmentLauncherScript({
       electronBinaryPath: "/repo/node_modules/electron/Electron",
