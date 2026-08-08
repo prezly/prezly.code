@@ -24,7 +24,11 @@ function ChatIndexRouteView() {
   const { authGateState } = Route.useRouteContext();
   const { environments } = useEnvironments();
 
-  if (authGateState.status === "hosted-static" && environments.length === 0) {
+  if (
+    authGateState.status === "hosted-static" &&
+    environments.length === 0 &&
+    !PRODUCT_CAPABILITIES.managedProjects
+  ) {
     return <HostedStaticOnboardingState />;
   }
 

@@ -10,7 +10,7 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL } from "../branding";
+import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL, PRODUCT_PROFILE } from "../branding";
 import { resolveServerBackedAppDisplayName } from "../branding.logic";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
@@ -66,6 +66,14 @@ export const Route = createRootRoute({
     }
 
     if (isHostedStaticApp(new URL(window.location.href))) {
+      return {
+        authGateState: {
+          status: "hosted-static",
+        } as const,
+      };
+    }
+
+    if (PRODUCT_PROFILE.id === "p3") {
       return {
         authGateState: {
           status: "hosted-static",
