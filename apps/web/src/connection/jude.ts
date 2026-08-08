@@ -49,7 +49,10 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
   readonly method: "GET" | "POST";
 }) {
   const response = yield* Effect.tryPromise({
-    try: () => input.fetch(`${JUDE_DESKTOP_PROXY_PATH}${input.path}`, { method: input.method }),
+    try: () =>
+      input.fetch.call(globalThis, `${JUDE_DESKTOP_PROXY_PATH}${input.path}`, {
+        method: input.method,
+      }),
     catch: (cause) => discoveryError(input.operation, cause),
   });
   if (!response.ok) {

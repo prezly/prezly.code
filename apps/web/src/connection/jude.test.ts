@@ -34,6 +34,18 @@ describe("Jude discovery", () => {
     expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
   });
 
+  it("invokes browser fetch with the global receiver", async () => {
+    let receiver: unknown;
+    const fetch = vi.fn(function (this: unknown) {
+      receiver = this;
+      return Promise.resolve(new Response(JSON.stringify({ sessions: [] })));
+    }) as typeof globalThis.fetch;
+
+    await Effect.runPromise(listJudeSessions(fetch));
+
+    expect(receiver).toBe(globalThis);
+  });
+
   it("requests a fresh pairing URL for an environment", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       new Response(

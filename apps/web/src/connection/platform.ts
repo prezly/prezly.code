@@ -519,9 +519,9 @@ const platformConnectionSourceLayer = Layer.effect(
         const sessionsResult = yield* listJudeSessions().pipe(Effect.result);
 
         if (sessionsResult._tag === "Failure") {
-          yield* Effect.logWarning("Could not refresh Jude environments.", {
-            cause: sessionsResult.failure,
-          });
+          yield* Effect.logWarning(
+            `Could not refresh Jude environments: ${sessionsResult.failure.message}`,
+          );
           return [...previous.values()]
             .filter(
               (cached) =>
