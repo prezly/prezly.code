@@ -137,11 +137,18 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
       linuxIconPng: BRAND_ASSET_PATHS.nightlyLinuxIconPng,
       windowsIconIco: BRAND_ASSET_PATHS.nightlyWindowsIconIco,
     });
+
+    assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17", "p3"), {
+      macIconPng: BRAND_ASSET_PATHS.prezlyMacIconPng,
+      linuxIconPng: BRAND_ASSET_PATHS.prezlyLinuxIconPng,
+      windowsIconIco: BRAND_ASSET_PATHS.prezlyWindowsIconIco,
+    });
   });
 
   it("switches the bundled splash and favicon branding for nightly versions", () => {
     assert.equal(resolveDesktopWebAssetBrand("0.0.17"), "production");
     assert.equal(resolveDesktopWebAssetBrand("0.0.17-nightly.20260413.42"), "nightly");
+    assert.equal(resolveDesktopWebAssetBrand("0.0.17", "p3"), "p3");
   });
 
   it.effect("resolves GitHub desktop publish config from Effect config", () =>

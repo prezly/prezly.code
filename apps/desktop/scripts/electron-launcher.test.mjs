@@ -3,10 +3,43 @@ import { assert, describe, it } from "vite-plus/test";
 import {
   makeDevelopmentLauncherScript,
   resolveElectronBinaryPath,
+  resolveLauncherBranding,
+  resolveLocalUserDataDir,
   resolveMacLauncherPaths,
 } from "./electron-launcher.mjs";
 
 describe("electron development launcher", () => {
+  it("resolves the Prezly bundle identity and icon", () => {
+    assert.deepEqual(
+      resolveLauncherBranding({
+        development: false,
+        productProfileId: "p3",
+        repoName: "t3code",
+      }),
+      {
+        displayName: "Prezly.code",
+        bundleId: "com.prezly.p3code",
+        protocolSchemes: ["p3code"],
+        macIconFileName: "prezly-code.icns",
+        macIconPngPath: "assets/p3/prezly-code-macos-1024.png",
+      },
+    );
+  });
+
+  it("resolves a dedicated Prezly Electron data directory", () => {
+    assert.equal(
+      resolveLocalUserDataDir({
+        appData: undefined,
+        development: false,
+        homeDirectory: "/Users/alice",
+        platform: "darwin",
+        stateDirectoryName: "p3code",
+        xdgConfigHome: undefined,
+      }),
+      "/Users/alice/Library/Application Support/p3code",
+    );
+  });
+
   it("uses captured values only as fallbacks for a live runner environment", () => {
     const script = makeDevelopmentLauncherScript({
       electronBinaryPath: "/repo/node_modules/electron/Electron",
@@ -16,6 +49,7 @@ describe("electron development launcher", () => {
         VITE_DEV_SERVER_URL: "http://127.0.0.1:8526",
         T3CODE_PORT: "16566",
         T3CODE_HOME: "/tmp/t3",
+        P3CODE_HOME: "/tmp/p3",
       },
     });
 
@@ -24,6 +58,7 @@ describe("electron development launcher", () => {
       "if [ -z \"${VITE_DEV_SERVER_URL:-}\" ]; then export VITE_DEV_SERVER_URL='http://127.0.0.1:8526'; fi",
     );
     assert.notInclude(script, "\nexport VITE_DEV_SERVER_URL=");
+    assert.include(script, "if [ -z \"${P3CODE_HOME:-}\" ]; then export P3CODE_HOME='/tmp/p3'; fi");
     assert.include(
       script,
       "exec '/repo/node_modules/electron/Electron' --t3code-dev-root='/repo/apps/desktop' '/repo/apps/desktop/dist-electron/main.cjs' \"$@\"",

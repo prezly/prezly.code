@@ -70,7 +70,11 @@ const resolveIconPath = Effect.fn("desktop.assets.resolveIconPath")(function* (
 > {
   const fileSystem = yield* FileSystem.FileSystem;
   const environment = yield* DesktopEnvironment.DesktopEnvironment;
-  if (environment.isDevelopment && environment.platform === "darwin" && ext === "png") {
+  if (
+    environment.platform === "darwin" &&
+    ext === "png" &&
+    (environment.isDevelopment || environment.productProfile.id === "p3")
+  ) {
     const developmentDockIconPath = environment.developmentDockIconPath;
     const developmentDockIconExists = yield* fileSystem.exists(developmentDockIconPath).pipe(
       Effect.mapError(

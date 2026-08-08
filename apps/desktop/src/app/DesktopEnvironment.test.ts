@@ -105,16 +105,36 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.productProfile.id, "p3");
       assert.equal(environment.branding.baseName, "Prezly.code");
       assert.equal(environment.branding.displayName, "Prezly.code");
-      assert.equal(environment.productProfile.desktop.applicationName, "Prezly code");
+      assert.equal(environment.productProfile.desktop.applicationName, "Prezly.code");
       assert.equal(environment.baseDir, "/Users/alice/.p3");
       assert.equal(environment.stateDir, "/Users/alice/.p3/userdata");
       assert.equal(environment.userDataDirName, "p3code");
       assert.equal(environment.appUserModelId, "com.prezly.p3code");
       assert.equal(environment.linuxDesktopEntryName, "p3code.desktop");
       assert.equal(environment.linuxWmClass, "p3code");
+      assert.equal(
+        environment.developmentDockIconPath,
+        "/repo/assets/p3/prezly-code-macos-1024.png",
+      );
       assert.isFalse(environment.productProfile.capabilities.allowLocalEnvironment);
       assert.isFalse(environment.productProfile.capabilities.allowWorktreeManagement);
       assert.equal(environment.productProfile.capabilities.fixedWorkspaceRoot, "/source");
+    }),
+  );
+
+  it.effect("keeps P3 state isolated from an ambient T3 home override", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment(
+        { productProfileId: "p3" },
+        {
+          T3CODE_HOME: "/shared/t3",
+          P3CODE_HOME: "/isolated/p3",
+        },
+      );
+
+      assert.equal(environment.baseDir, "/isolated/p3");
+      assert.equal(environment.stateDir, "/isolated/p3/userdata");
+      assert.notEqual(environment.baseDir, "/shared/t3");
     }),
   );
 

@@ -210,7 +210,7 @@ describe("DesktopApplicationMenu", () => {
       );
 
       const template = yield* Deferred.await(applicationMenuTemplate);
-      assert.equal(template[0]?.label, "Prezly code");
+      assert.equal(template[0]?.label, "Prezly.code");
     }),
   );
 });
