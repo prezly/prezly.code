@@ -106,7 +106,7 @@ import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
-import { PRODUCT_CAPABILITIES } from "../branding";
+import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import { refreshJudeEnvironments } from "../connection/jude";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
@@ -2791,7 +2791,7 @@ export default function Sidebar() {
                 snooze: supportsSnooze,
                 pinning: supportsPinning,
                 titleRegeneration: supportsTitleRegeneration,
-                environmentRefresh: PRODUCT_CAPABILITIES.managedProjects,
+                judeLink: PRODUCT_PROFILE.judeBaseUrl !== null,
               },
               snoozePresets,
             }),
@@ -2887,8 +2887,18 @@ export default function Sidebar() {
               copyBranchToClipboard(thread.branch, { branch: thread.branch });
             }
             return;
-          case "refresh-jude-environments":
-            await handleRefreshJude();
+          case "open-jude":
+            try {
+              if (PRODUCT_PROFILE.judeBaseUrl) {
+                await api.shell.openExternal(PRODUCT_PROFILE.judeBaseUrl);
+              }
+            } catch (error) {
+              toastManager.add({
+                type: "error",
+                title: "Could not open Jude",
+                description: error instanceof Error ? error.message : "An error occurred.",
+              });
+            }
             return;
           case "delete": {
             if (confirmThreadDelete) {

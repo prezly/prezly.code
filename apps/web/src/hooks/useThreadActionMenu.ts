@@ -35,8 +35,7 @@ import { useCopyToClipboard } from "./useCopyToClipboard";
 import { useNewThreadHandler } from "./useHandleNewThread";
 import { useClientSettings } from "./useSettings";
 import { useThreadActions } from "./useThreadActions";
-import { PRODUCT_CAPABILITIES } from "../branding";
-import { refreshJudeEnvironments } from "../connection/jude";
+import { PRODUCT_PROFILE } from "../branding";
 
 function failureToast(title: string, error: unknown) {
   toastManager.add(
@@ -114,7 +113,7 @@ export function useThreadActionMenu(input: {
           snooze: readEnvironmentSupportsSnooze(threadRef.environmentId),
           pinning: readEnvironmentSupportsPinning(threadRef.environmentId),
           titleRegeneration: readEnvironmentSupportsTitleRegeneration(threadRef.environmentId),
-          environmentRefresh: PRODUCT_CAPABILITIES.managedProjects,
+          judeLink: PRODUCT_PROFILE.judeBaseUrl !== null,
         };
         const isRegeneratingTitle = thread.titleRegeneration != null;
         const snoozePresets = resolveSnoozePresets(now, timestampFormat);
@@ -245,11 +244,13 @@ export function useThreadActionMenu(input: {
               copyBranchToClipboard(thread.branch, { branch: thread.branch });
             }
             return;
-          case "refresh-jude-environments":
+          case "open-jude":
             try {
-              await refreshJudeEnvironments();
+              if (PRODUCT_PROFILE.judeBaseUrl) {
+                await api.shell.openExternal(PRODUCT_PROFILE.judeBaseUrl);
+              }
             } catch (error) {
-              failureToast("Could not refresh Jude environments", error);
+              failureToast("Could not open Jude", error);
             }
             return;
           case "delete": {

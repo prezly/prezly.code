@@ -14,7 +14,7 @@ const baseState: ThreadActionMenuState = {
     snooze: true,
     pinning: true,
     titleRegeneration: true,
-    environmentRefresh: false,
+    judeLink: false,
   },
   snoozePresets: [
     { id: "hour", label: "In 1 hour", whenLabel: "3:00 PM", snoozedUntil: "2026-08-07T15:00:00Z" },
@@ -35,7 +35,7 @@ describe("buildThreadActionMenuItems", () => {
           snooze: false,
           pinning: false,
           titleRegeneration: false,
-          environmentRefresh: false,
+          judeLink: false,
         },
       }),
     ).toEqual(["rename", "mark-unread", "copy-path", "delete"]);
@@ -76,12 +76,12 @@ describe("buildThreadActionMenuItems", () => {
     expect(items.at(-1)).toMatchObject({ id: "delete", destructive: true });
   });
 
-  it("adds Jude refresh when managed environments support it", () => {
+  it("adds the Jude link when managed environments support it", () => {
     const menuIds = ids({
       ...baseState,
-      supports: { ...baseState.supports, environmentRefresh: true },
+      supports: { ...baseState.supports, judeLink: true },
     });
-    expect(menuIds).toContain("refresh-jude-environments");
-    expect(menuIds.indexOf("refresh-jude-environments")).toBe(menuIds.length - 2);
+    expect(menuIds).toContain("open-jude");
+    expect(menuIds.indexOf("open-jude")).toBe(menuIds.length - 2);
   });
 });
