@@ -12,6 +12,7 @@ export interface ProductCapabilities {
 export interface ProductProfile {
   readonly id: ProductProfileId;
   readonly baseName: string;
+  readonly judeBaseUrl: string | null;
   readonly capabilities: ProductCapabilities;
   readonly desktop: {
     readonly appId: string;
@@ -25,6 +26,7 @@ export interface ProductProfile {
 const T3_PRODUCT_PROFILE: ProductProfile = {
   id: "t3",
   baseName: "T3 Code",
+  judeBaseUrl: null,
   capabilities: {
     allowLocalEnvironment: true,
     allowManualConnections: true,
@@ -45,6 +47,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
 const P3_PRODUCT_PROFILE: ProductProfile = {
   id: "p3",
   baseName: "P3.code",
+  judeBaseUrl: "https://jude.prezly.net",
   capabilities: {
     allowLocalEnvironment: false,
     allowManualConnections: false,

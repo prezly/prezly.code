@@ -19,6 +19,7 @@ describe("resolveProductProfile", () => {
     expect(resolveProductProfile(" P3 ")).toEqual({
       id: "p3",
       baseName: "P3.code",
+      judeBaseUrl: "https://jude.prezly.net",
       capabilities: {
         allowLocalEnvironment: false,
         allowManualConnections: false,

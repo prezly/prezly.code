@@ -25,6 +25,7 @@ import { bootstrapRemoteBearerSession } from "@t3tools/client-runtime/authorizat
 import { fetchRemoteEnvironmentDescriptor } from "@t3tools/client-runtime/environment";
 import { managedRelayAccountChanges, managedRelaySessionAtom } from "@t3tools/client-runtime/relay";
 import { EnvironmentRpcRequestObserver } from "@t3tools/client-runtime/rpc";
+import { resolveRemotePairingTarget } from "@t3tools/shared/remote";
 import {
   AuthStandardClientScopes,
   type DesktopBridge,
@@ -58,6 +59,8 @@ import {
   type DesktopSecondaryBootstrapsRead,
 } from "./desktopLocal";
 import { connectionStorageLayer } from "./storage";
+import { PRODUCT_PROFILE } from "../branding";
+import { issueJudeT3Pairing, listJudeSessions, type JudeSession } from "./jude";
 
 let nextObservedRpcRequestId = 0;
 
@@ -117,7 +120,7 @@ function clientMetadata() {
   const desktop = window.desktopBridge !== undefined;
   const platform = navigator.platform.trim();
   return {
-    label: desktop ? "T3 Code Desktop" : "T3 Code Web",
+    label: `${PRODUCT_PROFILE.baseName} ${desktop ? "Desktop" : "Web"}`,
     deviceType: "desktop" as const,
     ...(platform === "" ? {} : { os: platform }),
   };
@@ -357,6 +360,52 @@ const loadSecondaryConnectionRegistration = Effect.fn(
   };
 });
 
+const loadJudeConnectionRegistration = Effect.fn(
+  "web.connectionPlatform.loadJudeConnectionRegistration",
+)(function* (session: JudeSession) {
+  const pairing = yield* issueJudeT3Pairing(session.id);
+  const pairingTarget = yield* Effect.try({
+    try: () => resolveRemotePairingTarget({ pairingUrl: pairing.pairingUrl }),
+    catch: (cause) =>
+      new ConnectionTransientError({
+        reason: "remote-unavailable",
+        detail: `Jude returned an invalid T3 pairing URL for ${session.name}: ${String(cause)}`,
+      }),
+  });
+  const descriptor = yield* fetchRemoteEnvironmentDescriptor({
+    httpBaseUrl: pairingTarget.httpBaseUrl,
+  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  const issuedAtEpochMs = yield* Clock.currentTimeMillis;
+  const access = yield* bootstrapRemoteBearerSession({
+    httpBaseUrl: pairingTarget.httpBaseUrl,
+    credential: pairingTarget.credential,
+    scopes: AuthStandardClientScopes,
+    clientMetadata: clientMetadata(),
+  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  const connectionId = `jude:${session.id}`;
+  const label = session.name.trim() || descriptor.label;
+
+  return {
+    registration: new BearerConnectionRegistration({
+      target: new BearerConnectionTarget({
+        environmentId: descriptor.environmentId,
+        label,
+        connectionId,
+      }),
+      profile: new BearerConnectionProfile({
+        connectionId,
+        environmentId: descriptor.environmentId,
+        label,
+        httpBaseUrl: pairingTarget.httpBaseUrl,
+        wsBaseUrl: pairingTarget.wsBaseUrl,
+      }),
+      credential: new BearerConnectionCredential({ token: access.access_token }),
+    }),
+    expiresAtEpochMs: secondaryBearerExpiresAtEpochMs(issuedAtEpochMs, access.expires_in),
+    refreshAtEpochMs: secondaryBearerRefreshAtEpochMs(issuedAtEpochMs, access.expires_in),
+  };
+});
+
 // Poll cadence for the desktop bootstrap topology. There is no change event on
 // the bridge, so the renderer polls; successful registrations are cached by a
 // signature of their endpoint + token until bearer credentials approach expiry.
@@ -462,6 +511,85 @@ const platformConnectionSourceLayer = Layer.effect(
       });
     }
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
+
+    if (PRODUCT_PROFILE.id === "p3") {
+      const buildJudePlatformRegistrations = Effect.gen(function* () {
+        const previous = yield* Ref.get(cacheRef);
+        const nowEpochMs = yield* Clock.currentTimeMillis;
+        const sessionsResult = yield* listJudeSessions().pipe(Effect.result);
+
+        if (sessionsResult._tag === "Failure") {
+          yield* Effect.logWarning("Could not refresh Jude environments.", {
+            cause: sessionsResult.failure,
+          });
+          return [...previous.values()]
+            .filter(
+              (cached) =>
+                cached.expiresAtEpochMs === undefined || nowEpochMs < cached.expiresAtEpochMs,
+            )
+            .map((cached) => cached.registration);
+        }
+
+        const next = new Map<string, CachedPlatformRegistration>();
+        const registrations: PlatformConnectionRegistration[] = [];
+        const readySessions = sessionsResult.success.filter(
+          (session) => session.status === "ready" && session.urls.t3.trim().length > 0,
+        );
+
+        yield* Effect.forEach(
+          readySessions,
+          (session) =>
+            Effect.gen(function* () {
+              const cacheKey = `jude:${session.id}`;
+              const signature = `${session.id}|${session.name}|${session.urls.t3}`;
+              const cached = previous.get(cacheKey);
+              if (
+                cached !== undefined &&
+                canReuseCachedPlatformRegistration(cached, signature, nowEpochMs)
+              ) {
+                next.set(cacheKey, cached);
+                registrations.push(cached.registration);
+                return;
+              }
+
+              const built = yield* loadJudeConnectionRegistration(session).pipe(
+                Effect.tapError((error) =>
+                  Effect.logWarning("Could not connect a Jude environment.", {
+                    sessionId: session.id,
+                    error,
+                  }),
+                ),
+                Effect.option,
+              );
+              if (Option.isSome(built)) {
+                const cacheEntry = { signature, ...built.value };
+                next.set(cacheKey, cacheEntry);
+                registrations.push(built.value.registration);
+              } else if (
+                cached !== undefined &&
+                canRetainCachedPlatformRegistrationAfterRefreshFailure(
+                  cached,
+                  signature,
+                  nowEpochMs,
+                )
+              ) {
+                next.set(cacheKey, cached);
+                registrations.push(cached.registration);
+              }
+            }),
+          { concurrency: 4, discard: true },
+        );
+
+        yield* Ref.set(cacheRef, next);
+        return registrations;
+      }).pipe(Effect.provide(FetchHttpClient.layer));
+
+      return PlatformConnectionSource.of({
+        registrations: Stream.tick(PLATFORM_POLL_INTERVAL).pipe(
+          Stream.mapEffect(() => buildJudePlatformRegistrations),
+        ),
+      });
+    }
 
     // Resolve the full set of platform-managed environments the host currently
     // reports: the primary (same-origin cookie auth) plus any desktop-local

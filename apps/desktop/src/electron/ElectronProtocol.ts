@@ -60,6 +60,7 @@ export interface DesktopProtocolRegistrationInput {
   readonly targetOrigin?: URL;
   readonly staticRootDirectory?: string;
   readonly backendOrigin?: URL;
+  readonly judeOrigin?: URL;
   readonly clerkFrontendApiHostname: string | undefined;
 }
 
@@ -186,6 +187,33 @@ async function proxyRequest(
   return withContentSecurityPolicy(response, contentSecurityPolicy);
 }
 
+const JUDE_PROXY_PATH_PREFIX = "/_p3/jude";
+
+async function proxyJudeRequest(
+  request: Request,
+  judeOrigin: URL,
+  contentSecurityPolicy: string,
+): Promise<Response> {
+  const requestUrl = new URL(request.url);
+  const targetPath = requestUrl.pathname.slice(JUDE_PROXY_PATH_PREFIX.length) || "/";
+  const targetUrl = new URL(`${targetPath}${requestUrl.search}`, judeOrigin);
+  const headers = new Headers(request.headers);
+  headers.delete("origin");
+  headers.delete("referer");
+  headers.delete("host");
+  const init: RequestInit = {
+    method: request.method,
+    headers,
+    redirect: "manual",
+  };
+  if (request.method !== "GET" && request.method !== "HEAD") {
+    init.body = request.body;
+    (init as RequestInit & { duplex: "half" }).duplex = "half";
+  }
+  const response = await Electron.net.fetch(targetUrl.toString(), init);
+  return withContentSecurityPolicy(response, contentSecurityPolicy);
+}
+
 function resolveStaticRendererPath(requestUrl: URL, rootDirectory: string): string | null {
   let pathname: string;
   try {
@@ -260,6 +288,15 @@ export const make = Effect.gen(function* () {
         Effect.try({
           try: () => {
             Electron.protocol.handle(input.scheme, (request) => {
+              const requestUrl = new URL(request.url);
+              if (
+                input.judeOrigin !== undefined &&
+                requestUrl.host === DESKTOP_HOST &&
+                (requestUrl.pathname === JUDE_PROXY_PATH_PREFIX ||
+                  requestUrl.pathname.startsWith(`${JUDE_PROXY_PATH_PREFIX}/`))
+              ) {
+                return proxyJudeRequest(request, input.judeOrigin, contentSecurityPolicy);
+              }
               if (input.staticRootDirectory !== undefined) {
                 return serveStaticRequest(
                   request,

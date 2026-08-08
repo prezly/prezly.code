@@ -145,6 +145,35 @@ describe("ElectronProtocol", () => {
     }).pipe(Effect.provide(ElectronProtocol.layer)),
   );
 
+  it.effect("proxies P3 Jude discovery through Electron", () =>
+    Effect.gen(function* () {
+      let handler: ((request: Request) => Promise<Response>) | undefined;
+      handleMock.mockImplementation((_scheme, nextHandler) => {
+        handler = nextHandler;
+      });
+      netFetchMock.mockResolvedValue(new Response('{"sessions":[]}'));
+
+      const response = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const protocol = yield* ElectronProtocol.ElectronProtocol;
+          yield* protocol.registerDesktopProtocol({
+            scheme: "p3code",
+            staticRootDirectory: "/opt/p3/client",
+            judeOrigin: new URL("https://jude.prezly.net"),
+            clerkFrontendApiHostname: undefined,
+          });
+          return yield* Effect.promise(() =>
+            handler!(new Request("p3code://app/_p3/jude/api/sessions")),
+          );
+        }),
+      );
+
+      assert.equal(yield* Effect.promise(() => response.text()), '{"sessions":[]}');
+      assert.equal(netFetchMock.mock.calls[0]?.[0], "https://jude.prezly.net/api/sessions");
+      assert.equal((netFetchMock.mock.calls[0]?.[1] as RequestInit).method, "GET");
+    }).pipe(Effect.provide(ElectronProtocol.layer)),
+  );
+
   it.effect("retries transient renderer target failures", () =>
     Effect.gen(function* () {
       let handler: ((request: Request) => Promise<Response>) | undefined;

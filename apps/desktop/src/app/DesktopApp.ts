@@ -168,6 +168,9 @@ const bootstrap = Effect.gen(function* () {
     yield* electronProtocol.registerDesktopProtocol({
       scheme,
       ...rendererRegistration,
+      ...(environment.productProfile.judeBaseUrl === null
+        ? {}
+        : { judeOrigin: new URL(environment.productProfile.judeBaseUrl) }),
       clerkFrontendApiHostname: DesktopClerk.desktopClerkFrontendApiHostname,
     });
     yield* installDesktopIpcHandlers();
