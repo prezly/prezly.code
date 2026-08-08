@@ -1,7 +1,9 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as NodePath from "node:path";
 import * as NodeTimersPromises from "node:timers/promises";
+import * as NodeUrl from "node:url";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -11,17 +13,22 @@ import * as Electron from "electron";
 export const DESKTOP_HOST = "app";
 export const DESKTOP_PRODUCTION_SCHEME = "t3code";
 export const DESKTOP_DEVELOPMENT_SCHEME = "t3code-dev";
+export const P3_DESKTOP_PRODUCTION_SCHEME = "p3code";
+export const P3_DESKTOP_DEVELOPMENT_SCHEME = "p3code-dev";
 
-export function getDesktopScheme(isDevelopment: boolean): string {
-  return isDevelopment ? DESKTOP_DEVELOPMENT_SCHEME : DESKTOP_PRODUCTION_SCHEME;
+export function getDesktopScheme(
+  isDevelopment: boolean,
+  protocolScheme = DESKTOP_PRODUCTION_SCHEME,
+): string {
+  return isDevelopment ? `${protocolScheme}-dev` : protocolScheme;
 }
 
-export function getDesktopOrigin(isDevelopment: boolean): string {
-  return `${getDesktopScheme(isDevelopment)}://${DESKTOP_HOST}`;
+export function getDesktopOrigin(isDevelopment: boolean, protocolScheme?: string): string {
+  return `${getDesktopScheme(isDevelopment, protocolScheme)}://${DESKTOP_HOST}`;
 }
 
-export function getDesktopUrl(isDevelopment: boolean): string {
-  return `${getDesktopOrigin(isDevelopment)}/`;
+export function getDesktopUrl(isDevelopment: boolean, protocolScheme?: string): string {
+  return `${getDesktopOrigin(isDevelopment, protocolScheme)}/`;
 }
 
 export class ElectronProtocolRegistrationError extends Schema.TaggedErrorClass<ElectronProtocolRegistrationError>()(
@@ -50,8 +57,9 @@ export class ElectronProtocolUnregistrationError extends Schema.TaggedErrorClass
 
 export interface DesktopProtocolRegistrationInput {
   readonly scheme: string;
-  readonly targetOrigin: URL;
-  readonly backendOrigin: URL;
+  readonly targetOrigin?: URL;
+  readonly staticRootDirectory?: string;
+  readonly backendOrigin?: URL;
   readonly clerkFrontendApiHostname: string | undefined;
 }
 
@@ -109,26 +117,22 @@ function withContentSecurityPolicy(response: Response, policy: string): Response
  * Must run synchronously during process bootstrap, before Electron emits `ready`.
  */
 export function registerDesktopSchemePrivilegesSync(): void {
-  Electron.protocol.registerSchemesAsPrivileged([
-    {
-      scheme: DESKTOP_PRODUCTION_SCHEME,
+  Electron.protocol.registerSchemesAsPrivileged(
+    [
+      DESKTOP_PRODUCTION_SCHEME,
+      DESKTOP_DEVELOPMENT_SCHEME,
+      P3_DESKTOP_PRODUCTION_SCHEME,
+      P3_DESKTOP_DEVELOPMENT_SCHEME,
+    ].map((scheme) => ({
+      scheme,
       privileges: {
         standard: true,
         secure: true,
         supportFetchAPI: true,
         corsEnabled: true,
       },
-    },
-    {
-      scheme: DESKTOP_DEVELOPMENT_SCHEME,
-      privileges: {
-        standard: true,
-        secure: true,
-        supportFetchAPI: true,
-        corsEnabled: true,
-      },
-    },
-  ]);
+    })),
+  );
 }
 
 const registerDesktopSchemePrivileges = Effect.sync(registerDesktopSchemePrivilegesSync).pipe(
@@ -182,6 +186,47 @@ async function proxyRequest(
   return withContentSecurityPolicy(response, contentSecurityPolicy);
 }
 
+function resolveStaticRendererPath(requestUrl: URL, rootDirectory: string): string | null {
+  let pathname: string;
+  try {
+    pathname = decodeURIComponent(requestUrl.pathname);
+  } catch {
+    return null;
+  }
+
+  const root = NodePath.resolve(rootDirectory);
+  const relativePath = pathname.replace(/^\/+/, "");
+  const requestedPath = NodePath.resolve(root, relativePath);
+  if (requestedPath !== root && !requestedPath.startsWith(`${root}${NodePath.sep}`)) {
+    return null;
+  }
+
+  return pathname.endsWith("/") || NodePath.extname(requestedPath) === ""
+    ? NodePath.join(root, "index.html")
+    : requestedPath;
+}
+
+async function serveStaticRequest(
+  request: Request,
+  rootDirectory: string,
+  contentSecurityPolicy: string,
+): Promise<Response> {
+  const requestUrl = new URL(request.url);
+  if (requestUrl.host !== DESKTOP_HOST) {
+    return new Response(null, { status: 404 });
+  }
+
+  const filePath = resolveStaticRendererPath(requestUrl, rootDirectory);
+  if (filePath === null) {
+    return new Response(null, { status: 404 });
+  }
+
+  const response = await Electron.net.fetch(NodeUrl.pathToFileURL(filePath).href, {
+    method: request.method,
+  });
+  return withContentSecurityPolicy(response, contentSecurityPolicy);
+}
+
 const TRANSIENT_FETCH_RETRY_DELAYS_MS = [0, 50, 150] as const;
 
 async function fetchWithTransientRetry(url: string, init: RequestInit): Promise<Response> {
@@ -214,9 +259,19 @@ export const make = Effect.gen(function* () {
       yield* Effect.acquireRelease(
         Effect.try({
           try: () => {
-            Electron.protocol.handle(input.scheme, (request) =>
-              proxyRequest(request, input.targetOrigin, contentSecurityPolicy),
-            );
+            Electron.protocol.handle(input.scheme, (request) => {
+              if (input.staticRootDirectory !== undefined) {
+                return serveStaticRequest(
+                  request,
+                  input.staticRootDirectory,
+                  contentSecurityPolicy,
+                );
+              }
+              if (input.targetOrigin !== undefined) {
+                return proxyRequest(request, input.targetOrigin, contentSecurityPolicy);
+              }
+              return Promise.resolve(new Response(null, { status: 500 }));
+            });
           },
           catch: (cause) => new ElectronProtocolRegistrationError({ scheme: input.scheme, cause }),
         }).pipe(Effect.andThen(Ref.set(registered, true))),

@@ -113,6 +113,38 @@ describe("ElectronProtocol", () => {
     }).pipe(Effect.provide(ElectronProtocol.layer)),
   );
 
+  it.effect("serves P3's bundled renderer without a local backend", () =>
+    Effect.gen(function* () {
+      let handler: ((request: Request) => Promise<Response>) | undefined;
+      handleMock.mockImplementation((_scheme, nextHandler) => {
+        handler = nextHandler;
+      });
+      netFetchMock.mockResolvedValue(new Response("p3"));
+
+      const response = yield* Effect.scoped(
+        Effect.gen(function* () {
+          const protocol = yield* ElectronProtocol.ElectronProtocol;
+          yield* protocol.registerDesktopProtocol({
+            scheme: "p3code",
+            staticRootDirectory: "/opt/p3/client",
+            clerkFrontendApiHostname: undefined,
+          });
+          return yield* Effect.promise(() =>
+            handler!(new Request("p3code://app/settings/connections")),
+          );
+        }),
+      );
+
+      assert.equal(yield* Effect.promise(() => response.text()), "p3");
+      assert.equal(netFetchMock.mock.calls[0]?.[0], "file:///opt/p3/client/index.html");
+      assert.deepEqual(netFetchMock.mock.calls[0]?.[1], { method: "GET" });
+      assert.include(
+        response.headers.get("content-security-policy") ?? "",
+        "img-src 'self' p3code: blob: data: http: https:",
+      );
+    }).pipe(Effect.provide(ElectronProtocol.layer)),
+  );
+
   it.effect("retries transient renderer target failures", () =>
     Effect.gen(function* () {
       let handler: ((request: Request) => Promise<Response>) | undefined;
