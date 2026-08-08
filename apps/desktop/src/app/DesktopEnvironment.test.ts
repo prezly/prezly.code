@@ -103,7 +103,9 @@ describe("DesktopEnvironment", () => {
       const environment = yield* makeEnvironment({ productProfileId: "p3" });
 
       assert.equal(environment.productProfile.id, "p3");
-      assert.equal(environment.branding.baseName, "P3.code");
+      assert.equal(environment.branding.baseName, "Prezly.code");
+      assert.equal(environment.branding.displayName, "Prezly.code");
+      assert.equal(environment.productProfile.desktop.applicationName, "Prezly code");
       assert.equal(environment.baseDir, "/Users/alice/.p3");
       assert.equal(environment.stateDir, "/Users/alice/.p3/userdata");
       assert.equal(environment.userDataDirName, "p3code");

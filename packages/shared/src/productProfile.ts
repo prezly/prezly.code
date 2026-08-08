@@ -16,6 +16,7 @@ export interface ProductProfile {
   readonly capabilities: ProductCapabilities;
   readonly desktop: {
     readonly appId: string;
+    readonly applicationName: string | null;
     readonly executableName: string;
     readonly homeDirectoryName: string;
     readonly protocolScheme: string;
@@ -37,6 +38,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
   },
   desktop: {
     appId: "com.t3tools.t3code",
+    applicationName: null,
     executableName: "t3code",
     homeDirectoryName: ".t3",
     protocolScheme: "t3code",
@@ -46,7 +48,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
 
 const P3_PRODUCT_PROFILE: ProductProfile = {
   id: "p3",
-  baseName: "P3.code",
+  baseName: "Prezly.code",
   judeBaseUrl: "https://jude.prezly.net",
   capabilities: {
     allowLocalEnvironment: false,
@@ -58,6 +60,7 @@ const P3_PRODUCT_PROFILE: ProductProfile = {
   },
   desktop: {
     appId: "com.prezly.p3code",
+    applicationName: "Prezly code",
     executableName: "p3code",
     homeDirectoryName: ".p3",
     protocolScheme: "p3code",

@@ -211,4 +211,26 @@ describe("DesktopAppIdentity", () => {
       },
     );
   });
+
+  it.effect("uses the dedicated Prezly name in the macOS application menu", () => {
+    const calls: ElectronAppCalls = {
+      setAboutPanelOptions: [],
+      setDockIcon: [],
+      setName: [],
+    };
+
+    return withIdentity(
+      Effect.gen(function* () {
+        const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
+        yield* identity.configure;
+
+        assert.deepEqual(calls.setName, ["Prezly code"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "Prezly code");
+      }),
+      {
+        calls,
+        environment: { productProfileId: "p3" },
+      },
+    );
+  });
 });

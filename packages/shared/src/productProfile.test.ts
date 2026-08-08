@@ -18,7 +18,7 @@ describe("resolveProductProfile", () => {
   it("defines P3 as a Jude-managed remote-only product", () => {
     expect(resolveProductProfile(" P3 ")).toEqual({
       id: "p3",
-      baseName: "P3.code",
+      baseName: "Prezly.code",
       judeBaseUrl: "https://jude.prezly.net",
       capabilities: {
         allowLocalEnvironment: false,
@@ -30,6 +30,7 @@ describe("resolveProductProfile", () => {
       },
       desktop: {
         appId: "com.prezly.p3code",
+        applicationName: "Prezly code",
         executableName: "p3code",
         homeDirectoryName: ".p3",
         protocolScheme: "p3code",

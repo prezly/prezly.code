@@ -119,9 +119,11 @@ export const make = Effect.gen(function* () {
 
   const configure = Effect.gen(function* () {
     const commitHash = yield* resolveAboutCommitHash;
-    yield* electronApp.setName(environment.displayName);
+    const applicationName =
+      environment.productProfile.desktop.applicationName ?? environment.displayName;
+    yield* electronApp.setName(applicationName);
     yield* electronApp.setAboutPanelOptions({
-      applicationName: environment.displayName,
+      applicationName,
       applicationVersion: environment.appVersion,
       version: Option.getOrElse(commitHash, () => "unknown"),
     });

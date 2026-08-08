@@ -102,7 +102,10 @@ function resolveDesktopAppBranding(input: {
   return {
     baseName: input.productProfile.baseName,
     stageLabel,
-    displayName: `${input.productProfile.baseName} (${stageLabel})`,
+    displayName:
+      input.productProfile.id === "p3"
+        ? input.productProfile.baseName
+        : `${input.productProfile.baseName} (${stageLabel})`,
   };
 }
 

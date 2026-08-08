@@ -76,7 +76,8 @@ describe("branding", () => {
     const branding = await import("./branding");
 
     expect(branding.PRODUCT_PROFILE.id).toBe("p3");
-    expect(branding.APP_BASE_NAME).toBe("P3.code");
+    expect(branding.APP_BASE_NAME).toBe("Prezly.code");
+    expect(branding.APP_DISPLAY_NAME).toBe("Prezly.code");
     expect(branding.PRODUCT_CAPABILITIES).toMatchObject({
       allowLocalEnvironment: false,
       allowWorktreeManagement: false,

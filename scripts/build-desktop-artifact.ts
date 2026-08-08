@@ -1534,11 +1534,12 @@ export function resolveDesktopProductName(
   productProfileId: ProductProfileId = "t3",
 ): string {
   const productProfile = resolveProductProfile(productProfileId);
+  if (productProfile.id === "p3") {
+    return productProfile.baseName;
+  }
   return resolveDesktopUpdateChannel(version) === "nightly"
     ? `${productProfile.baseName} (Nightly)`
-    : productProfile.id === "t3"
-      ? (desktopPackageJson.productName ?? "T3 Code")
-      : `${productProfile.baseName} (Alpha)`;
+    : (desktopPackageJson.productName ?? "T3 Code");
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -2177,7 +2178,7 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
     Flag.optional,
   ),
 }).pipe(
-  Command.withDescription("Build a desktop artifact for T3 Code or P3.code."),
+  Command.withDescription("Build a desktop artifact for T3 Code or Prezly.code."),
   Command.withHandler((input) => Effect.flatMap(resolveBuildOptions(input), buildDesktopArtifact)),
 );
 

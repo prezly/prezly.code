@@ -1,6 +1,6 @@
-# P3.code
+# Prezly.code
 
-P3.code is Prezly's managed, desktop-only T3 Code product profile. It keeps T3's provider,
+Prezly.code is Prezly's managed, desktop-only T3 Code product profile. It keeps T3's provider,
 thread, and orchestration internals while replacing local environment management with Jude.
 
 ## Product model
@@ -40,7 +40,7 @@ Platform-specific targets accept the same option, for example:
 pnpm dist:desktop:dmg:arm64 -- --product-profile p3
 ```
 
-The profile produces the P3.code application name, `com.prezly.p3code` application identifier,
+The profile produces the Prezly.code application name, `com.prezly.p3code` application identifier,
 `p3code` protocol scheme, separate application data, and a renderer-only desktop process without
 a local T3 backend.
 
