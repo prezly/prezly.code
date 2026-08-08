@@ -1,12 +1,13 @@
 import {
   ChevronsLeftRightEllipsisIcon,
+  ExternalLinkIcon,
   PlusIcon,
   QrCodeIcon,
   RefreshCwIcon,
   TerminalIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { type ReactNode, memo, useCallback, useId, useMemo, useState } from "react";
+import { type ReactNode, memo, useCallback, useEffect, useId, useMemo, useState } from "react";
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
@@ -34,6 +35,7 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import * as DateTime from "effect/DateTime";
+import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
@@ -135,6 +137,13 @@ import { ServerUpdateAction, ServerUpdateProgress } from "../ServerUpdateAction"
 import { CloudEnvironmentConnectRows } from "../cloud/CloudEnvironmentConnectList";
 import { ITEM_ROW_CLASSNAME, ITEM_ROW_INNER_CLASSNAME } from "./itemRows";
 import { PRODUCT_CAPABILITIES } from "~/branding";
+import { PRODUCT_PROFILE } from "~/branding";
+import {
+  formatJudeAppName,
+  judeSessionDetailUrl,
+  listJudeSessions,
+  type JudeSession,
+} from "~/connection/jude";
 
 const DEFAULT_TAILSCALE_SERVE_PORT = 443;
 const EMPTY_ADVERTISED_ENDPOINTS: ReadonlyArray<AdvertisedEndpoint> = [];
@@ -3442,6 +3451,26 @@ function StandardConnectionsSettings() {
 
 function ManagedJudeConnectionsSettings() {
   const { environments } = useEnvironments();
+  const [sessions, setSessions] = useState<ReadonlyArray<JudeSession>>([]);
+  const judeBaseUrl = PRODUCT_PROFILE.judeBaseUrl;
+
+  useEffect(() => {
+    let active = true;
+    void Effect.runPromise(listJudeSessions()).then(
+      (nextSessions) => {
+        if (active) setSessions(nextSessions);
+      },
+      () => undefined,
+    );
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const sessionById = useMemo(
+    () => new Map(sessions.map((session) => [session.id, session] as const)),
+    [sessions],
+  );
 
   return (
     <SettingsPageContainer>
@@ -3452,20 +3481,49 @@ function ManagedJudeConnectionsSettings() {
             description="Ready Jude environments appear automatically while you are connected to Warp."
           />
         ) : (
-          environments.map((environment) => (
-            <SettingsRow
-              key={environment.environmentId}
-              title={environment.label}
-              description={connectionStatusText(environment.connection)}
-              control={
-                <ConnectionStatusDot
-                  tooltipText={connectionStatusText(environment.connection)}
-                  dotClassName={connectionPhaseDotClassName(environment.connection.phase)}
-                  pingClassName={connectionPhasePingClassName(environment.connection.phase)}
-                />
-              }
-            />
-          ))
+          environments.map((environment) => {
+            const connectionId =
+              environment.entry.target._tag === "BearerConnectionTarget"
+                ? environment.entry.target.connectionId
+                : null;
+            const sessionId = connectionId?.startsWith("jude:")
+              ? connectionId.slice("jude:".length)
+              : null;
+            const session = sessionId ? sessionById.get(sessionId) : undefined;
+            const status = connectionStatusText(environment.connection);
+            return (
+              <SettingsRow
+                key={environment.environmentId}
+                title={environment.label}
+                description={session ? `${formatJudeAppName(session.project)} · ${status}` : status}
+                control={
+                  <>
+                    {sessionId && judeBaseUrl ? (
+                      <Button
+                        render={
+                          <a
+                            href={judeSessionDetailUrl(judeBaseUrl, sessionId)}
+                            target="_blank"
+                            rel="noreferrer"
+                          />
+                        }
+                        size="xs"
+                        variant="ghost"
+                      >
+                        Open in Jude
+                        <ExternalLinkIcon className="size-3" />
+                      </Button>
+                    ) : null}
+                    <ConnectionStatusDot
+                      tooltipText={status}
+                      dotClassName={connectionPhaseDotClassName(environment.connection.phase)}
+                      pingClassName={connectionPhasePingClassName(environment.connection.phase)}
+                    />
+                  </>
+                }
+              />
+            );
+          })
         )}
       </SettingsSection>
     </SettingsPageContainer>

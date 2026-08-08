@@ -13,6 +13,8 @@ const JudeSessionStatus = Schema.Literals([
 const JudeSessionSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
+  prompt: Schema.String,
+  project: Schema.String,
   status: JudeSessionStatus,
   urls: Schema.Struct({
     t3: Schema.String,
@@ -33,6 +35,22 @@ export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
 
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
+
+const JUDE_APP_NAMES: Readonly<Record<string, string>> = {
+  app: "App",
+  website: "Website",
+  "admin-v2": "Admin v2",
+  jude: "Jude",
+  jenny: "Jenny",
+};
+
+export function formatJudeAppName(project: string): string {
+  return JUDE_APP_NAMES[project] ?? project;
+}
+
+export function judeSessionDetailUrl(judeBaseUrl: string, sessionId: string): string {
+  return new URL(`/session/${encodeURIComponent(sessionId)}`, judeBaseUrl).toString();
+}
 
 function discoveryError(operation: string, cause: unknown) {
   const detail = cause instanceof Error ? cause.message : String(cause);

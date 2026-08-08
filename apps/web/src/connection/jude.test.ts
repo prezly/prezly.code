@@ -3,9 +3,22 @@ import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
 import { describe, expect, it, vi } from "vite-plus/test";
 
-import { issueJudeT3Pairing, listJudeSessions } from "./jude.ts";
+import {
+  formatJudeAppName,
+  issueJudeT3Pairing,
+  judeSessionDetailUrl,
+  listJudeSessions,
+} from "./jude.ts";
 
 describe("Jude discovery", () => {
+  it("formats Jude app names and detail links", () => {
+    expect(formatJudeAppName("admin-v2")).toBe("Admin v2");
+    expect(formatJudeAppName("custom-app")).toBe("custom-app");
+    expect(judeSessionDetailUrl("https://jude.prezly.net", "admin/fix")).toBe(
+      "https://jude.prezly.net/session/admin%2Ffix",
+    );
+  });
+
   it("reads the authoritative session list", async () => {
     const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
       new Response(
@@ -14,6 +27,8 @@ describe("Jude discovery", () => {
             {
               id: "admin-fix-search",
               name: "Fix search",
+              prompt: "Fix search",
+              project: "admin-v2",
               status: "ready",
               urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
               ignored: "field",
@@ -27,6 +42,8 @@ describe("Jude discovery", () => {
       {
         id: "admin-fix-search",
         name: "Fix search",
+        prompt: "Fix search",
+        project: "admin-v2",
         status: "ready",
         urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
       },
