@@ -29,9 +29,17 @@ export const BRAND_ASSET_PATHS = {
   developmentWebFavicon16Png: "assets/dev/blueprint-web-favicon-16x16.png",
   developmentWebFavicon32Png: "assets/dev/blueprint-web-favicon-32x32.png",
   developmentWebAppleTouchIconPng: "assets/dev/blueprint-web-apple-touch-180.png",
+
+  prezlyMacIconPng: "assets/p3/prezly-code-macos-1024.png",
+  prezlyLinuxIconPng: "assets/p3/prezly-code-universal-1024.png",
+  prezlyWindowsIconIco: "assets/p3/prezly-code-windows.ico",
+  prezlyWebFaviconIco: "assets/p3/prezly-code-web-favicon.ico",
+  prezlyWebFavicon16Png: "assets/p3/prezly-code-web-favicon-16x16.png",
+  prezlyWebFavicon32Png: "assets/p3/prezly-code-web-favicon-32x32.png",
+  prezlyWebAppleTouchIconPng: "assets/p3/prezly-code-web-apple-touch-180.png",
 } as const;
 
-export type WebAssetBrand = "development" | "nightly" | "production";
+export type WebAssetBrand = "development" | "nightly" | "p3" | "production";
 
 export const WEB_ASSET_CHANNELS = ["latest", "nightly"] as const;
 
@@ -75,6 +83,12 @@ const WEB_ICON_SOURCE_PATHS_BY_BRAND = {
     favicon16Png: BRAND_ASSET_PATHS.productionWebFavicon16Png,
     favicon32Png: BRAND_ASSET_PATHS.productionWebFavicon32Png,
     appleTouchIconPng: BRAND_ASSET_PATHS.productionWebAppleTouchIconPng,
+  },
+  p3: {
+    faviconIco: BRAND_ASSET_PATHS.prezlyWebFaviconIco,
+    favicon16Png: BRAND_ASSET_PATHS.prezlyWebFavicon16Png,
+    favicon32Png: BRAND_ASSET_PATHS.prezlyWebFavicon32Png,
+    appleTouchIconPng: BRAND_ASSET_PATHS.prezlyWebAppleTouchIconPng,
   },
 } as const satisfies Record<WebAssetBrand, Record<keyof typeof WEB_ICON_TARGET_FILENAMES, string>>;
 

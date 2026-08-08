@@ -73,6 +73,13 @@ describe("brand-assets", () => {
     });
   });
 
+  it("maps P3 web assets to Prezly icons", () => {
+    expect(resolveWebIconOverrides("p3", "apps/web/dist")).toContainEqual({
+      sourceRelativePath: BRAND_ASSET_PATHS.prezlyWebFaviconIco,
+      targetRelativePath: "apps/web/dist/favicon.ico",
+    });
+  });
+
   it("maps hosted release channels to web asset brands", () => {
     expect(resolveWebAssetBrandForChannel("latest")).toBe("production");
     expect(resolveWebAssetBrandForChannel("nightly")).toBe("nightly");

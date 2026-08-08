@@ -224,8 +224,8 @@ describe("DesktopAppIdentity", () => {
         const identity = yield* DesktopAppIdentity.DesktopAppIdentity;
         yield* identity.configure;
 
-        assert.deepEqual(calls.setName, ["Prezly code"]);
-        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "Prezly code");
+        assert.deepEqual(calls.setName, ["Prezly.code"]);
+        assert.equal(calls.setAboutPanelOptions[0]?.applicationName, "Prezly.code");
       }),
       {
         calls,

@@ -31,7 +31,7 @@ describe("resolveProductProfile", () => {
       },
       desktop: {
         appId: "com.prezly.p3code",
-        applicationName: "Prezly code",
+        applicationName: "Prezly.code",
         executableName: "p3code",
         homeDirectoryName: ".p3",
         protocolScheme: "p3code",
