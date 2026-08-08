@@ -31,6 +31,9 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
+const decodeJudeSessionsResponse = Schema.decodeUnknownEffect(JudeSessionsResponseSchema);
+const decodeJudeT3Pairing = Schema.decodeUnknownEffect(JudeT3PairingSchema);
+
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
 
@@ -143,7 +146,7 @@ export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
     path: "/api/sessions",
     method: "GET",
   });
-  const response = yield* Schema.decodeUnknownEffect(JudeSessionsResponseSchema)(body).pipe(
+  const response = yield* decodeJudeSessionsResponse(body).pipe(
     Effect.mapError((cause) => discoveryError("session discovery", cause)),
   );
   publishJudeSessions(response.sessions);
@@ -165,7 +168,7 @@ export const issueJudeT3Pairing = Effect.fn("web.jude.issueT3Pairing")(function*
     path: `/api/sessions/${encodeURIComponent(sessionId)}/t3-pairing`,
     method: "POST",
   });
-  return yield* Schema.decodeUnknownEffect(JudeT3PairingSchema)(body).pipe(
+  return yield* decodeJudeT3Pairing(body).pipe(
     Effect.mapError((cause) => discoveryError(`T3 pairing for ${sessionId}`, cause)),
   );
 });

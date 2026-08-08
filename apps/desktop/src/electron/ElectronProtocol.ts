@@ -1,9 +1,10 @@
+// @effect-diagnostics nodeBuiltinImport:off - Electron protocol callbacks resolve bundled renderer paths synchronously.
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as NodePath from "node:path";
 import * as NodeTimersPromises from "node:timers/promises";
-import * as NodeUrl from "node:url";
+import * as NodeURL from "node:url";
 import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
@@ -249,7 +250,7 @@ async function serveStaticRequest(
     return new Response(null, { status: 404 });
   }
 
-  const response = await Electron.net.fetch(NodeUrl.pathToFileURL(filePath).href, {
+  const response = await Electron.net.fetch(NodeURL.pathToFileURL(filePath).href, {
     method: request.method,
   });
   return withContentSecurityPolicy(response, contentSecurityPolicy);

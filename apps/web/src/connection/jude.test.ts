@@ -1,7 +1,8 @@
 import { ConnectionTransientError } from "@t3tools/client-runtime/connection";
+import { describe, it } from "@effect/vitest";
 import * as Cause from "effect/Cause";
 import * as Effect from "effect/Effect";
-import { describe, expect, it, vi } from "vite-plus/test";
+import { expect, vi } from "vite-plus/test";
 
 import {
   formatJudeAppName,
@@ -59,10 +60,10 @@ describe("Jude discovery", () => {
     expect(listener).toHaveBeenCalledOnce();
   });
 
-  it("reads the authoritative session list", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
+  it.effect("reads the authoritative session list", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json({
           sessions: [
             {
               id: "admin-fix-search",
@@ -75,63 +76,66 @@ describe("Jude discovery", () => {
             },
           ],
         }),
-      ),
-    );
+      );
 
-    await expect(Effect.runPromise(listJudeSessions(fetch))).resolves.toEqual([
-      {
-        id: "admin-fix-search",
-        name: "Fix search",
-        prompt: "Fix search",
-        project: "admin-v2",
-        status: "ready",
-        urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
-      },
-    ]);
-    expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
-  });
+      expect(yield* listJudeSessions(fetch)).toEqual([
+        {
+          id: "admin-fix-search",
+          name: "Fix search",
+          prompt: "Fix search",
+          project: "admin-v2",
+          status: "ready",
+          urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
+        },
+      ]);
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
+    }),
+  );
 
-  it("invokes browser fetch with the global receiver", async () => {
-    let receiver: unknown;
-    const fetch = vi.fn(function (this: unknown) {
-      receiver = this;
-      return Promise.resolve(new Response(JSON.stringify({ sessions: [] })));
-    }) as typeof globalThis.fetch;
+  it.effect("invokes browser fetch with the global receiver", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn(function (this: unknown) {
+        expect(this).toBe(globalThis);
+        return Promise.resolve(Response.json({ sessions: [] }));
+      }) as typeof globalThis.fetch;
 
-    await Effect.runPromise(listJudeSessions(fetch));
+      yield* listJudeSessions(fetch);
 
-    expect(receiver).toBe(globalThis);
-  });
+      expect(fetch).toHaveBeenCalledOnce();
+    }),
+  );
 
-  it("requests a fresh pairing URL for an environment", async () => {
-    const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
-      new Response(
-        JSON.stringify({
+  it.effect("requests a fresh pairing URL for an environment", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json({
           pairingUrl: "https://admin-fix-search.t3.jude.prezly.dev/pair#token=fresh",
           expiresAt: "2026-08-08T13:00:00Z",
           serverVersion: "0.0.31",
         }),
-      ),
-    );
+      );
 
-    await expect(Effect.runPromise(issueJudeT3Pairing("admin/fix", fetch))).resolves.toMatchObject({
-      pairingUrl: "https://admin-fix-search.t3.jude.prezly.dev/pair#token=fresh",
-    });
-    expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions/admin%2Ffix/t3-pairing", {
-      method: "POST",
-    });
-  });
+      expect(yield* issueJudeT3Pairing("admin/fix", fetch)).toMatchObject({
+        pairingUrl: "https://admin-fix-search.t3.jude.prezly.dev/pair#token=fresh",
+      });
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions/admin%2Ffix/t3-pairing", {
+        method: "POST",
+      });
+    }),
+  );
 
-  it("surfaces Jude failures as retryable environment failures", async () => {
-    const fetch = vi
-      .fn<typeof globalThis.fetch>()
-      .mockResolvedValue(new Response(null, { status: 503 }));
+  it.effect("surfaces Jude failures as retryable environment failures", () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 503 }));
 
-    const exit = await Effect.runPromiseExit(listJudeSessions(fetch));
-    expect(exit._tag).toBe("Failure");
-    if (exit._tag === "Failure") {
-      const error = Cause.squash(exit.cause);
-      expect(error).toBeInstanceOf(ConnectionTransientError);
-    }
-  });
+      const exit = yield* Effect.exit(listJudeSessions(fetch));
+      expect(exit._tag).toBe("Failure");
+      if (exit._tag === "Failure") {
+        const error = Cause.squash(exit.cause);
+        expect(error).toBeInstanceOf(ConnectionTransientError);
+      }
+    }),
+  );
 });

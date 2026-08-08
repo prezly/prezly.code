@@ -170,7 +170,9 @@ describe("ElectronProtocol", () => {
 
       assert.equal(yield* Effect.promise(() => response.text()), '{"sessions":[]}');
       assert.equal(netFetchMock.mock.calls[0]?.[0], "https://jude.prezly.net/api/sessions");
-      assert.equal((netFetchMock.mock.calls[0]?.[1] as RequestInit).method, "GET");
+      const requestInit = netFetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
+      assert.isDefined(requestInit);
+      assert.equal(requestInit.method, "GET");
     }).pipe(Effect.provide(ElectronProtocol.layer)),
   );
 

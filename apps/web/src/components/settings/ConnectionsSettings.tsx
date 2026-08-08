@@ -7,7 +7,7 @@ import {
   TerminalIcon,
 } from "lucide-react";
 import { useAtomValue } from "@effect/atom-react";
-import { type ReactNode, memo, useCallback, useEffect, useId, useMemo, useState } from "react";
+import { type ReactNode, memo, useCallback, useId, useMemo, useState } from "react";
 import {
   AuthAccessReadScope,
   AuthAccessWriteScope,
@@ -35,7 +35,6 @@ import {
   squashAtomCommandFailure,
 } from "@t3tools/client-runtime/state/runtime";
 import * as DateTime from "effect/DateTime";
-import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
