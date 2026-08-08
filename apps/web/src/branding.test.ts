@@ -69,6 +69,21 @@ describe("branding", () => {
     expect(branding.HOSTED_APP_CHANNEL).toBeNull();
     expect(branding.HOSTED_APP_CHANNEL_LABEL).toBeNull();
   });
+
+  it("uses the P3 product profile for a P3 web build", async () => {
+    vi.stubEnv("VITE_T3CODE_PRODUCT_PROFILE", "p3");
+
+    const branding = await import("./branding");
+
+    expect(branding.PRODUCT_PROFILE.id).toBe("p3");
+    expect(branding.APP_BASE_NAME).toBe("P3.code");
+    expect(branding.PRODUCT_CAPABILITIES).toMatchObject({
+      allowLocalEnvironment: false,
+      allowWorktreeManagement: false,
+      fixedWorkspaceRoot: "/source",
+      managedProjects: true,
+    });
+  });
 });
 
 describe("branding logic", () => {

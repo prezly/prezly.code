@@ -206,6 +206,10 @@
     "./devProxy": {
       "types": "./src/devProxy.ts",
       "import": "./src/devProxy.ts"
+    },
+    "./productProfile": {
+      "types": "./src/productProfile.ts",
+      "import": "./src/productProfile.ts"
     }
   },
   "scripts": {
