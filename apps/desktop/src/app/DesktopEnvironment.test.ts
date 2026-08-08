@@ -98,6 +98,24 @@ describe("DesktopEnvironment", () => {
     }),
   );
 
+  it.effect("isolates P3 identity and state from T3", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({ productProfileId: "p3" });
+
+      assert.equal(environment.productProfile.id, "p3");
+      assert.equal(environment.branding.baseName, "P3.code");
+      assert.equal(environment.baseDir, "/Users/alice/.p3");
+      assert.equal(environment.stateDir, "/Users/alice/.p3/userdata");
+      assert.equal(environment.userDataDirName, "p3code");
+      assert.equal(environment.appUserModelId, "com.prezly.p3code");
+      assert.equal(environment.linuxDesktopEntryName, "p3code.desktop");
+      assert.equal(environment.linuxWmClass, "p3code");
+      assert.isFalse(environment.productProfile.capabilities.allowLocalEnvironment);
+      assert.isFalse(environment.productProfile.capabilities.allowWorktreeManagement);
+      assert.equal(environment.productProfile.capabilities.fixedWorkspaceRoot, "/source");
+    }),
+  );
+
   it.effect("keeps implicit development state separate from production state", () =>
     Effect.gen(function* () {
       const development = yield* makeEnvironment(

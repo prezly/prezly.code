@@ -16,6 +16,7 @@ export interface ProductProfile {
   readonly desktop: {
     readonly appId: string;
     readonly executableName: string;
+    readonly homeDirectoryName: string;
     readonly protocolScheme: string;
     readonly stateDirectoryName: string;
   };
@@ -35,6 +36,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
   desktop: {
     appId: "com.t3tools.t3code",
     executableName: "t3code",
+    homeDirectoryName: ".t3",
     protocolScheme: "t3code",
     stateDirectoryName: "t3code",
   },
@@ -54,6 +56,7 @@ const P3_PRODUCT_PROFILE: ProductProfile = {
   desktop: {
     appId: "com.prezly.p3code",
     executableName: "p3code",
+    homeDirectoryName: ".p3",
     protocolScheme: "p3code",
     stateDirectoryName: "p3code",
   },

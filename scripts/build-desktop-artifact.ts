@@ -6,6 +6,11 @@ import { fromYaml } from "@t3tools/shared/schemaYaml";
 import { HostProcessPlatform } from "@t3tools/shared/hostProcess";
 import { clerkFrontendApiHostnameFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { resolveSpawnCommand } from "@t3tools/shared/shell";
+import {
+  resolveProductProfile,
+  type ProductProfile,
+  type ProductProfileId,
+} from "@t3tools/shared/productProfile";
 import rootPackageJson from "../package.json" with { type: "json" };
 import desktopPackageJson from "../apps/desktop/package.json" with { type: "json" };
 import serverPackageJson from "../apps/server/package.json" with { type: "json" };
@@ -35,11 +40,11 @@ import { Command, Flag } from "effect/unstable/cli";
 import { ChildProcess, ChildProcessSpawner } from "effect/unstable/process";
 
 const LINUX_ICON_SIZES = [16, 22, 24, 32, 48, 64, 128, 256, 512] as const;
-const DESKTOP_APP_ID = "com.t3tools.t3code";
 const APPLE_TEAM_ID_PATTERN = /^[A-Z0-9]{10}$/u;
 
 const BuildPlatform = Schema.Literals(["mac", "linux", "win"]);
 const BuildArch = Schema.Literals(["arm64", "x64", "universal"]);
+const ProductProfileIdSchema = Schema.Literals(["t3", "p3"]);
 
 const WorkspaceConfig = Schema.Struct({
   catalog: Schema.optional(Schema.Record(Schema.String, Schema.String)),
@@ -133,6 +138,7 @@ const PLATFORM_CONFIG: Record<typeof BuildPlatform.Type, PlatformConfig> = {
 };
 
 interface BuildCliInput {
+  readonly productProfile?: Option.Option<ProductProfileId>;
   readonly platform: Option.Option<typeof BuildPlatform.Type>;
   readonly target: Option.Option<string>;
   readonly arch: Option.Option<typeof BuildArch.Type>;
@@ -594,6 +600,7 @@ const resolvePythonForNodeGyp = Effect.fn("resolvePythonForNodeGyp")(function* (
 });
 
 interface ResolvedBuildOptions {
+  readonly productProfile: ProductProfile;
   readonly platform: typeof BuildPlatform.Type;
   readonly target: string;
   readonly arch: typeof BuildArch.Type;
@@ -818,7 +825,7 @@ export function resolveMacPasskeySigningConfiguration(
   }
 
   return {
-    appId: DESKTOP_APP_ID,
+    appId: resolveProductProfile(env.T3CODE_PRODUCT_PROFILE).desktop.appId,
     teamId,
     rpDomains: uniqueRpDomains,
     provisioningProfilePath,
@@ -1024,6 +1031,9 @@ const AzureTrustedSigningOptionsConfig = Config.all({
 });
 
 const BuildEnvConfig = Config.all({
+  productProfile: Config.schema(ProductProfileIdSchema, "T3CODE_PRODUCT_PROFILE").pipe(
+    Config.option,
+  ),
   platform: Config.schema(BuildPlatform, "T3CODE_DESKTOP_PLATFORM").pipe(Config.option),
   target: Config.string("T3CODE_DESKTOP_TARGET").pipe(Config.option),
   arch: Config.schema(BuildArch, "T3CODE_DESKTOP_ARCH").pipe(Config.option),
@@ -1083,6 +1093,9 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
   const repoRoot = yield* RepoRoot;
   const env = yield* BuildEnvConfig;
   const hostPlatform = yield* HostProcessPlatform;
+  const productProfile = resolveProductProfile(
+    mergeOptions(input.productProfile ?? Option.none(), env.productProfile, "t3"),
+  );
 
   const platform = mergeOptions(
     input.platform,
@@ -1135,6 +1148,7 @@ export const resolveBuildOptions = Effect.fn("resolveBuildOptions")(function* (
     Option.getOrUndefined(input.wslPrebuild) ?? Option.getOrUndefined(env.wslPrebuild);
 
   return {
+    productProfile,
     platform,
     target,
     arch,
@@ -1515,10 +1529,16 @@ export function resolvePackageManagerUserAgent(packageManager: string): string {
   return `${trimmed.slice(0, versionSeparator)}/${trimmed.slice(versionSeparator + 1)}`;
 }
 
-export function resolveDesktopProductName(version: string): string {
+export function resolveDesktopProductName(
+  version: string,
+  productProfileId: ProductProfileId = "t3",
+): string {
+  const productProfile = resolveProductProfile(productProfileId);
   return resolveDesktopUpdateChannel(version) === "nightly"
-    ? "T3 Code (Nightly)"
-    : (desktopPackageJson.productName ?? "T3 Code");
+    ? `${productProfile.baseName} (Nightly)`
+    : productProfile.id === "t3"
+      ? (desktopPackageJson.productName ?? "T3 Code")
+      : `${productProfile.baseName} (Alpha)`;
 }
 
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
@@ -1534,11 +1554,17 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
         readonly provisioningProfilePath: string;
       }
     | undefined,
+  productProfileId: ProductProfileId = "t3",
 ) {
+  const productProfile = resolveProductProfile(productProfileId);
+  const protocolSchemes = [
+    productProfile.desktop.protocolScheme,
+    `${productProfile.desktop.protocolScheme}-dev`,
+  ];
   const buildConfig: Record<string, unknown> = {
-    appId: DESKTOP_APP_ID,
-    productName: resolveDesktopProductName(version),
-    artifactName: "T3-Code-${version}-${arch}.${ext}",
+    appId: productProfile.desktop.appId,
+    productName: resolveDesktopProductName(version, productProfile.id),
+    artifactName: `${productProfile.baseName.replaceAll(".", "-")}-${version}-\${arch}.\${ext}`,
     electronLanguages: [...DESKTOP_ELECTRON_LANGUAGES],
     files: [...DESKTOP_FILE_EXCLUSIONS],
     directories: {
@@ -1570,8 +1596,8 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       category: "public.app-category.developer-tools",
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: productProfile.baseName,
+          schemes: protocolSchemes,
         },
       ],
       ...(macPasskeySigning
@@ -1586,7 +1612,7 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   if (platform === "linux") {
     buildConfig.linux = {
       target: [target],
-      executableName: "t3code",
+      executableName: productProfile.desktop.executableName,
       icon: "icons",
       category: "Development",
       // electron-builder turns these into MimeType=x-scheme-handler/<scheme>;
@@ -1594,13 +1620,13 @@ export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
       // t3code:// OAuth callbacks to the app.
       protocols: [
         {
-          name: "T3 Code",
-          schemes: ["t3code", "t3code-dev"],
+          name: productProfile.baseName,
+          schemes: protocolSchemes,
         },
       ],
       desktop: {
         entry: {
-          StartupWMClass: "t3code",
+          StartupWMClass: productProfile.desktop.executableName,
         },
       },
     };
@@ -1797,6 +1823,10 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     yield* runCommand(
       ChildProcess.make(spawnCommand.command, spawnCommand.args, {
         cwd: repoRoot,
+        env: {
+          ...process.env,
+          T3CODE_PRODUCT_PROFILE: options.productProfile.id,
+        },
         shell: spawnCommand.shell,
       }),
       { label: "vp run build:desktop", verbose: options.verbose },
@@ -1912,14 +1942,14 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
     stageDependencies,
   );
   const stagePackageJson: StagePackageJson = {
-    name: "t3code",
+    name: options.productProfile.desktop.executableName,
     version: appVersion,
     buildVersion: appVersion,
     t3codeCommitHash: commitHash,
     private: true,
     packageManager: rootPackageJson.packageManager,
-    description: "T3 Code desktop build",
-    author: "T3 Tools",
+    description: `${options.productProfile.baseName} desktop build`,
+    author: options.productProfile.id === "p3" ? "Prezly" : "T3 Tools",
     main: "apps/desktop/dist-electron/main.cjs",
     build: yield* createBuildConfig(
       options.platform,
@@ -1934,6 +1964,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
             provisioningProfilePath: macPasskeySigning.provisioningProfilePath,
           }
         : undefined,
+      options.productProfile.id,
     ),
     dependencies: stageDependencies,
     devDependencies: {
@@ -2084,6 +2115,10 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
 });
 
 const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
+  productProfile: Flag.choice("product-profile", ProductProfileIdSchema.literals).pipe(
+    Flag.withDescription("Product profile (env: T3CODE_PRODUCT_PROFILE)."),
+    Flag.optional,
+  ),
   platform: Flag.choice("platform", BuildPlatform.literals).pipe(
     Flag.withDescription("Build platform (env: T3CODE_DESKTOP_PLATFORM)."),
     Flag.optional,
@@ -2142,7 +2177,7 @@ const buildDesktopArtifactCli = Command.make("build-desktop-artifact", {
     Flag.optional,
   ),
 }).pipe(
-  Command.withDescription("Build a desktop artifact for T3 Code."),
+  Command.withDescription("Build a desktop artifact for T3 Code or P3.code."),
   Command.withHandler((input) => Effect.flatMap(resolveBuildOptions(input), buildDesktopArtifact)),
 );
 

@@ -93,7 +93,40 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
   it("switches desktop packaging product names to nightly for nightly builds", () => {
     assert.equal(resolveDesktopProductName("0.0.17"), "T3 Code (Alpha)");
     assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
+    assert.equal(resolveDesktopProductName("0.0.17", "p3"), "P3.code (Alpha)");
+    assert.equal(
+      resolveDesktopProductName("0.0.17-nightly.20260413.42", "p3"),
+      "P3.code (Nightly)",
+    );
   });
+
+  it.effect("builds an isolated P3 desktop identity", () =>
+    Effect.gen(function* () {
+      const config = yield* createBuildConfig(
+        "linux",
+        "AppImage",
+        "1.2.3",
+        false,
+        false,
+        undefined,
+        undefined,
+        "p3",
+      );
+
+      const linux = config.linux as Record<string, unknown>;
+      assert.equal(config.appId, "com.prezly.p3code");
+      assert.equal(config.productName, "P3.code (Alpha)");
+      assert.equal(config.artifactName, "P3-code-1.2.3-${arch}.${ext}");
+      assert.equal(linux.executableName, "p3code");
+      assert.equal(
+        (linux.desktop as { entry: { StartupWMClass: string } }).entry.StartupWMClass,
+        "p3code",
+      );
+      assert.deepStrictEqual(linux.protocols, [
+        { name: "P3.code", schemes: ["p3code", "p3code-dev"] },
+      ]);
+    }).pipe(Effect.provide(ConfigProvider.layer(ConfigProvider.fromEnv({ env: {} })))),
+  );
 
   it("switches desktop packaging icons to the nightly artwork for nightly versions", () => {
     assert.deepStrictEqual(resolveDesktopBuildIconAssets("0.0.17"), {

@@ -63,6 +63,11 @@ import * as DesktopWindow from "./window/DesktopWindow.ts";
 import * as DesktopWslBackend from "./wsl/DesktopWslBackend.ts";
 import * as DesktopWslEnvironment from "./wsl/DesktopWslEnvironment.ts";
 
+declare const __T3CODE_PRODUCT_PROFILE__: string | undefined;
+
+const buildProductProfileId =
+  typeof __T3CODE_PRODUCT_PROFILE__ === "undefined" ? undefined : __T3CODE_PRODUCT_PROFILE__;
+
 const desktopEnvironmentLayer = Layer.unwrap(
   Effect.gen(function* () {
     const metadata = yield* Effect.service(ElectronApp.ElectronApp).pipe(
@@ -75,6 +80,7 @@ const desktopEnvironmentLayer = Layer.unwrap(
       homeDirectory: NodeOS.homedir(),
       platform,
       processArch,
+      ...(buildProductProfileId === undefined ? {} : { productProfileId: buildProductProfileId }),
       ...metadata,
     });
   }),

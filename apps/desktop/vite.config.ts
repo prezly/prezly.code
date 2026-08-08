@@ -1,13 +1,16 @@
 import { defineConfig } from "vite-plus";
 
 import { loadRepoEnv } from "../../scripts/lib/public-config.ts";
+import { resolveProductProfile } from "@t3tools/shared/productProfile";
 
 const repoEnv = loadRepoEnv();
 const shouldLaunchElectronAfterPack = process.env.T3CODE_DESKTOP_DEV === "1";
+const productProfile = resolveProductProfile(process.env.T3CODE_PRODUCT_PROFILE);
 const publicConfigDefine = {
   __T3CODE_BUILD_CLERK_PUBLISHABLE_KEY__: JSON.stringify(
     repoEnv.T3CODE_CLERK_PUBLISHABLE_KEY?.trim() ?? "",
   ),
+  __T3CODE_PRODUCT_PROFILE__: JSON.stringify(productProfile.id),
 };
 
 export default defineConfig({
