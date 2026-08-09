@@ -31,11 +31,48 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
+const JudeGitHubIdentitySchema = Schema.Struct({
+  name: Schema.String,
+  default: Schema.Boolean,
+  legacy: Schema.Boolean,
+});
+
+const JudeModelSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  description: Schema.optional(Schema.String),
+});
+
+const JudeGitHubIdentitiesResponseSchema = Schema.Struct({
+  identities: Schema.Array(JudeGitHubIdentitySchema),
+});
+
+const JudeModelsResponseSchema = Schema.Struct({
+  models: Schema.Array(JudeModelSchema),
+});
+
 const decodeJudeSessionsResponse = Schema.decodeUnknownEffect(JudeSessionsResponseSchema);
 const decodeJudeT3Pairing = Schema.decodeUnknownEffect(JudeT3PairingSchema);
+const decodeJudeSession = Schema.decodeUnknownEffect(JudeSessionSchema);
+const decodeJudeGitHubIdentitiesResponse = Schema.decodeUnknownEffect(
+  JudeGitHubIdentitiesResponseSchema,
+);
+const decodeJudeModelsResponse = Schema.decodeUnknownEffect(JudeModelsResponseSchema);
+const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
+export type JudeGitHubIdentity = typeof JudeGitHubIdentitySchema.Type;
+export type JudeModel = typeof JudeModelSchema.Type;
+
+export interface CreateJudeSessionInput {
+  readonly prompt: string;
+  readonly project: string;
+  readonly model: string;
+  readonly baseRef: string;
+  readonly githubIdentity?: string;
+  readonly customLicenses?: ReadonlyArray<string>;
+}
 
 let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
 let judeSessionsSignature = "[]";
@@ -120,11 +157,20 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
   readonly operation: string;
   readonly path: string;
   readonly method: "GET" | "POST";
+  readonly body?: unknown;
+  readonly signal?: AbortSignal;
 }) {
   const response = yield* Effect.tryPromise({
     try: () =>
       input.fetch.call(globalThis, `${JUDE_DESKTOP_PROXY_PATH}${input.path}`, {
         method: input.method,
+        ...(input.body === undefined
+          ? {}
+          : {
+              headers: { "Content-Type": "application/json" },
+              body: encodeUnknownJson(input.body),
+            }),
+        ...(input.signal ? { signal: input.signal } : {}),
       }),
     catch: (cause) => discoveryError(input.operation, cause),
   });
@@ -172,3 +218,109 @@ export const issueJudeT3Pairing = Effect.fn("web.jude.issueT3Pairing")(function*
     Effect.mapError((cause) => discoveryError(`T3 pairing for ${sessionId}`, cause)),
   );
 });
+
+export const listJudeGitHubIdentities = Effect.fn("web.jude.listGitHubIdentities")(function* (
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+) {
+  const body = yield* requestJson({
+    fetch,
+    operation: "GitHub identity discovery",
+    path: "/api/github-identities",
+    method: "GET",
+  });
+  const response = yield* decodeJudeGitHubIdentitiesResponse(body).pipe(
+    Effect.mapError((cause) => discoveryError("GitHub identity discovery", cause)),
+  );
+  return response.identities;
+});
+
+export const listJudeModels = Effect.fn("web.jude.listModels")(function* (
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+) {
+  const body = yield* requestJson({
+    fetch,
+    operation: "model discovery",
+    path: "/api/models",
+    method: "GET",
+  });
+  const response = yield* decodeJudeModelsResponse(body).pipe(
+    Effect.mapError((cause) => discoveryError("model discovery", cause)),
+  );
+  return response.models;
+});
+
+export const createJudeSession = Effect.fn("web.jude.createSession")(function* (
+  input: CreateJudeSessionInput,
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+) {
+  const body = yield* requestJson({
+    fetch,
+    operation: "session creation",
+    path: "/api/sessions",
+    method: "POST",
+    body: input,
+  });
+  return yield* decodeJudeSession(body).pipe(
+    Effect.mapError((cause) => discoveryError("session creation", cause)),
+  );
+});
+
+function waitForDelay(delayMs: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(signal.reason);
+      return;
+    }
+    const onAbort = () => {
+      globalThis.clearTimeout(timeout);
+      reject(signal?.reason);
+    };
+    const timeout = globalThis.setTimeout(() => {
+      signal?.removeEventListener("abort", onAbort);
+      resolve();
+    }, delayMs);
+    signal?.addEventListener("abort", onAbort, { once: true });
+  });
+}
+
+export async function provisionJudeProject(
+  input: CreateJudeSessionInput,
+  options: {
+    readonly fetch?: typeof globalThis.fetch;
+    readonly signal?: AbortSignal;
+    readonly pollIntervalMs?: number;
+    readonly timeoutMs?: number;
+    readonly onCreated?: (session: JudeSession) => void;
+  } = {},
+): Promise<JudeSession> {
+  const fetch = options.fetch ?? globalThis.fetch;
+  const created = await Effect.runPromise(createJudeSession(input, fetch));
+  options.onCreated?.(created);
+  const deadline = Date.now() + (options.timeoutMs ?? 15 * 60_000);
+
+  while (Date.now() < deadline) {
+    if (created.status === "ready") {
+      requestJudeEnvironmentRefresh();
+      return created;
+    }
+    if (created.status === "failed" || created.status === "deleting") {
+      throw new Error(`Jude could not provision ${created.name}.`);
+    }
+
+    await waitForDelay(options.pollIntervalMs ?? 3_000, options.signal);
+    const sessions = await Effect.runPromise(listJudeSessions(fetch));
+    const session = sessions.find((candidate) => candidate.id === created.id);
+    if (!session) {
+      continue;
+    }
+    if (session.status === "ready") {
+      requestJudeEnvironmentRefresh();
+      return session;
+    }
+    if (session.status === "failed" || session.status === "deleting") {
+      throw new Error(`Jude could not provision ${session.name}.`);
+    }
+  }
+
+  throw new Error(`Jude is still provisioning ${created.name}. Try refreshing environments later.`);
+}

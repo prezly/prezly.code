@@ -10,8 +10,9 @@ thread, and orchestration internals while replacing local environment management
   and does not limit users to one prompt.
 - Jude is the authority for the environment list. Ready sessions appear automatically; sessions
   removed from Jude disappear from P3 after the next refresh.
-- P3 does not create local environments, projects, directories, or T3 worktrees. The Jude session
-  itself provides the isolated checkout.
+- P3 does not create local environments, directories, or T3 worktrees. Its **Create project** flow
+  provisions a Jude session, waits for it to become ready, and then refreshes the managed project
+  list. The Jude session itself provides the isolated checkout.
 - P3 currently relies on network access through Warp. There is no Jude user authentication or
   user-scoped discovery yet.
 

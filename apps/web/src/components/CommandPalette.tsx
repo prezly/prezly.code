@@ -83,6 +83,7 @@ import {
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { onOpenCommandPalette } from "../commandPaletteBus";
+import { openCreateJudeProject } from "../judeProjectBus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
@@ -1464,6 +1465,19 @@ function OpenCommandPaletteDialog(props: {
       keepOpen: true,
       run: async () => {
         openAddProjectFlow();
+      },
+    });
+  }
+
+  if (PRODUCT_CAPABILITIES.managedProjects) {
+    actionItems.push({
+      kind: "action",
+      value: "action:create-project",
+      searchTerms: ["create project", "new project", "jude", "environment", "repository"],
+      title: "Create project",
+      icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openCreateJudeProject();
       },
     });
   }

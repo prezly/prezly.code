@@ -5,6 +5,7 @@ import * as Effect from "effect/Effect";
 import { expect, vi } from "vite-plus/test";
 
 import {
+  createJudeSession,
   formatJudeAppName,
   issueJudeT3Pairing,
   judeAppNameForConnection,
@@ -12,6 +13,7 @@ import {
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
   listJudeSessions,
+  provisionJudeProject,
   requestJudeEnvironmentRefresh,
   subscribeToJudeEnvironmentRefresh,
 } from "./jude.ts";
@@ -123,6 +125,78 @@ describe("Jude discovery", () => {
       });
     }),
   );
+
+  it.effect("creates a Jude session with the selected project settings", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json(
+          {
+            id: "website-improve-search",
+            name: "Improve search",
+            prompt: "Improve search",
+            project: "website",
+            status: "provisioning",
+            urls: { t3: "" },
+          },
+          { status: 201 },
+        ),
+      );
+
+      const input = {
+        prompt: "Improve search",
+        project: "website",
+        model: "gpt-5.6-sol",
+        baseRef: "main",
+        githubIdentity: "coding-agent",
+      };
+      expect(yield* createJudeSession(input, fetch)).toMatchObject({
+        id: "website-improve-search",
+        status: "provisioning",
+      });
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main","githubIdentity":"coding-agent"}',
+      });
+    }),
+  );
+
+  it("waits for provisioning and refreshes the managed environments", async () => {
+    const provisioning = {
+      id: "website-improve-search",
+      name: "Improve search",
+      prompt: "Improve search",
+      project: "website",
+      status: "provisioning",
+      urls: { t3: "" },
+    };
+    const ready = {
+      ...provisioning,
+      status: "ready",
+      urls: { t3: "https://website-improve-search.t3.jude.prezly.dev" },
+    };
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json(provisioning, { status: 201 }))
+      .mockResolvedValueOnce(Response.json({ sessions: [ready] }));
+    const refreshListener = vi.fn();
+    const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
+
+    await expect(
+      provisionJudeProject(
+        {
+          prompt: "Improve search",
+          project: "website",
+          model: "gpt-5.6-sol",
+          baseRef: "main",
+        },
+        { fetch, pollIntervalMs: 0 },
+      ),
+    ).resolves.toMatchObject({ status: "ready" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(refreshListener).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
 
   it.effect("surfaces Jude failures as retryable environment failures", () =>
     Effect.gen(function* () {
