@@ -1,4 +1,4 @@
-import { type ServerProvider } from "@t3tools/contracts";
+import { type OrchestrationSession, type ServerProvider } from "@t3tools/contracts";
 import { memo } from "react";
 import { InfoIcon, XIcon } from "lucide-react";
 import { cn } from "~/lib/utils";
@@ -14,8 +14,18 @@ export function getProviderStatusBannerKey(status: ServerProvider | null): strin
 export function shouldShowProviderStatusBanner(
   status: ServerProvider | null,
   dismissedBannerKey: string | null,
+  activeSession: Pick<OrchestrationSession, "providerInstanceId" | "status"> | null = null,
 ): boolean {
   const bannerKey = getProviderStatusBannerKey(status);
+  if (
+    status &&
+    activeSession?.providerInstanceId === status.instanceId &&
+    (activeSession.status === "starting" ||
+      activeSession.status === "running" ||
+      activeSession.status === "ready")
+  ) {
+    return false;
+  }
   return bannerKey !== null && bannerKey !== dismissedBannerKey;
 }
 

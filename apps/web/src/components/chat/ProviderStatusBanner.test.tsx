@@ -34,6 +34,36 @@ describe("ProviderStatusBanner", () => {
     expect(shouldShowProviderStatusBanner(status, getProviderStatusBannerKey(status))).toBe(false);
   });
 
+  it("hides a stale probe warning when the same provider has a live session", () => {
+    const status = { ...warningProvider(), status: "error" as const };
+
+    for (const sessionStatus of ["starting", "running", "ready"] as const) {
+      expect(
+        shouldShowProviderStatusBanner(status, null, {
+          providerInstanceId: status.instanceId,
+          status: sessionStatus,
+        }),
+      ).toBe(false);
+    }
+  });
+
+  it("keeps the warning for stopped or unrelated provider sessions", () => {
+    const status = { ...warningProvider(), status: "error" as const };
+
+    expect(
+      shouldShowProviderStatusBanner(status, null, {
+        providerInstanceId: status.instanceId,
+        status: "stopped",
+      }),
+    ).toBe(true);
+    expect(
+      shouldShowProviderStatusBanner(status, null, {
+        providerInstanceId: ProviderInstanceId.make("codex-other"),
+        status: "running",
+      }),
+    ).toBe(true);
+  });
+
   it("renders an accessible dismiss control for provider warnings", () => {
     const markup = renderToStaticMarkup(
       <ProviderStatusBanner status={warningProvider()} onDismiss={() => {}} />,

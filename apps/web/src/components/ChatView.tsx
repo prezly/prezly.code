@@ -2622,6 +2622,7 @@ function ChatViewContent(props: ChatViewProps) {
   const visibleProviderStatus = shouldShowProviderStatusBanner(
     activeProviderStatus,
     dismissedProviderStatusBannerKey,
+    activeThread?.session ?? null,
   )
     ? activeProviderStatus
     : null;
