@@ -31,6 +31,7 @@ interface UpdatesHarnessOptions {
   readonly setDisableDifferentialDownload?: Effect.Effect<void>;
   readonly stopBackend?: Effect.Effect<void>;
   readonly env?: Record<string, string | undefined>;
+  readonly productProfileId?: DesktopEnvironment.MakeDesktopEnvironmentInput["productProfileId"];
 }
 
 const flushCallbacks = Effect.yieldNow;
@@ -139,6 +140,9 @@ function makeHarness(options: UpdatesHarnessOptions = {}) {
     isPackaged: true,
     resourcesPath: "/missing/resources",
     runningUnderArm64Translation: false,
+    ...(options.productProfileId === undefined
+      ? {}
+      : { productProfileId: options.productProfileId }),
   }).pipe(
     Layer.provide(
       Layer.mergeAll(
@@ -272,6 +276,31 @@ describe("DesktopUpdates", () => {
 
       assert.equal(harness.listenerCount(), 0);
     }).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
+  });
+
+  it.effect("keeps the updater inert for the Prezly product", () => {
+    const harness = makeHarness({ productProfileId: "p3" });
+
+    return Effect.scoped(
+      Effect.gen(function* () {
+        const updates = yield* DesktopUpdates.DesktopUpdates;
+        yield* updates.configure;
+
+        const state = yield* updates.getState;
+        const disabledReason = yield* updates.disabledReason;
+        assert.equal(state.enabled, false);
+        assert.equal(state.status, "disabled");
+        assert.deepEqual(
+          disabledReason,
+          Option.some("Desktop updates are disabled for Prezly.code."),
+        );
+        assert.deepEqual(harness.feedUrls(), []);
+        assert.equal(harness.listenerCount(), 0);
+
+        yield* TestClock.adjust(Duration.minutes(5));
+        assert.equal(harness.checkCount(), 0);
+      }),
+    ).pipe(Effect.provide(Layer.merge(TestClock.layer(), harness.layer)));
   });
 
   it.effect("updates and broadcasts state from updater events", () => {

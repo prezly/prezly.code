@@ -128,6 +128,7 @@ export const make = Effect.gen(function* () {
 
   const configure = Effect.gen(function* () {
     const appName = environment.productProfile.desktop.applicationName ?? (yield* electronApp.name);
+    const allowDesktopUpdates = environment.productProfile.capabilities.allowDesktopUpdates;
     const checkForUpdatesClick = () => {
       runMenuEffect("check-for-updates", handleCheckForUpdatesMenuClick);
     };
@@ -144,11 +145,15 @@ export const make = Effect.gen(function* () {
         label: appName,
         submenu: [
           { role: "about" },
-          {
-            label: "Check for Updates...",
-            click: checkForUpdatesClick,
-          },
-          { type: "separator" },
+          ...(allowDesktopUpdates
+            ? [
+                {
+                  label: "Check for Updates...",
+                  click: checkForUpdatesClick,
+                },
+                { type: "separator" as const },
+              ]
+            : []),
           {
             label: "Settings...",
             accelerator: "CmdOrCtrl+,",
@@ -211,15 +216,19 @@ export const make = Effect.gen(function* () {
         ],
       },
       { role: "windowMenu" },
-      {
-        role: "help",
-        submenu: [
-          {
-            label: "Check for Updates...",
-            click: checkForUpdatesClick,
-          },
-        ],
-      },
+      ...(allowDesktopUpdates
+        ? [
+            {
+              role: "help" as const,
+              submenu: [
+                {
+                  label: "Check for Updates...",
+                  click: checkForUpdatesClick,
+                },
+              ],
+            },
+          ]
+        : []),
     );
 
     yield* electronMenu.setApplicationMenu(template);

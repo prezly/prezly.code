@@ -1,6 +1,7 @@
 export type ProductProfileId = "t3" | "p3";
 
 export interface ProductCapabilities {
+  readonly allowDesktopUpdates: boolean;
   readonly allowLocalEnvironment: boolean;
   readonly allowManualConnections: boolean;
   readonly allowProjectManagement: boolean;
@@ -30,6 +31,7 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
   baseName: "T3 Code",
   judeBaseUrl: null,
   capabilities: {
+    allowDesktopUpdates: true,
     allowLocalEnvironment: true,
     allowManualConnections: true,
     allowProjectManagement: true,
@@ -53,6 +55,7 @@ const P3_PRODUCT_PROFILE: ProductProfile = {
   baseName: "Prezly.code",
   judeBaseUrl: "https://jude.prezly.net",
   capabilities: {
+    allowDesktopUpdates: false,
     allowLocalEnvironment: false,
     allowManualConnections: false,
     allowProjectManagement: false,

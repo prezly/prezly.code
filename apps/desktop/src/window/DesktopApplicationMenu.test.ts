@@ -211,6 +211,12 @@ describe("DesktopApplicationMenu", () => {
 
       const template = yield* Deferred.await(applicationMenuTemplate);
       assert.equal(template[0]?.label, "Prezly.code");
+      assert.isUndefined(template.find((item) => item.role === "help"));
+      const appMenu = template[0];
+      if (!Array.isArray(appMenu?.submenu)) {
+        throw new Error("Expected Prezly application submenu to be an array.");
+      }
+      assert.isUndefined(appMenu.submenu.find((item) => item.label === "Check for Updates..."));
     }),
   );
 });

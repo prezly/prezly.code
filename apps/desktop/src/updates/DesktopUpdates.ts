@@ -300,6 +300,11 @@ export const make = Effect.gen(function* () {
   );
 
   const resolveDisabledReason = Effect.gen(function* () {
+    if (!environment.productProfile.capabilities.allowDesktopUpdates) {
+      return Option.some(
+        `Desktop updates are disabled for ${environment.productProfile.baseName}.`,
+      );
+    }
     const hasFeedConfig = yield* hasUpdateFeedConfig;
     return Option.fromNullishOr(
       getAutoUpdateDisabledReason({
@@ -713,6 +718,14 @@ export const make = Effect.gen(function* () {
         void Effect.runPromiseWith(context)(effect);
       };
 
+      const settings = yield* desktopSettings.get;
+      if (!environment.productProfile.capabilities.allowDesktopUpdates) {
+        yield* setState(createBaseUpdateState(settings.updateChannel, false, environment));
+        yield* electronUpdater.setAutoDownload(false);
+        yield* electronUpdater.setAutoInstallOnAppQuit(false);
+        return;
+      }
+
       const appUpdateYmlConfig = yield* readAppUpdateYml;
       yield* Ref.set(appUpdateYmlConfigRef, appUpdateYmlConfig);
 
@@ -723,10 +736,11 @@ export const make = Effect.gen(function* () {
         } as ElectronUpdater.ElectronUpdaterFeedUrl);
       }
 
-      const settings = yield* desktopSettings.get;
       const enabled = yield* shouldEnableAutoUpdates;
       yield* setState(createBaseUpdateState(settings.updateChannel, enabled, environment));
       if (!enabled) {
+        yield* electronUpdater.setAutoDownload(false);
+        yield* electronUpdater.setAutoInstallOnAppQuit(false);
         return;
       }
       yield* Ref.set(updaterConfiguredRef, true);

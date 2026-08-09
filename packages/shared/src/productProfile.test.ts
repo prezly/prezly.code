@@ -8,6 +8,7 @@ describe("resolveProductProfile", () => {
       id: "t3",
       baseName: "T3 Code",
       capabilities: {
+        allowDesktopUpdates: true,
         allowLocalEnvironment: true,
         allowWorktreeManagement: true,
         fixedWorkspaceRoot: null,
@@ -21,6 +22,7 @@ describe("resolveProductProfile", () => {
       baseName: "Prezly.code",
       judeBaseUrl: "https://jude.prezly.net",
       capabilities: {
+        allowDesktopUpdates: false,
         allowLocalEnvironment: false,
         allowManualConnections: false,
         allowProjectManagement: false,
