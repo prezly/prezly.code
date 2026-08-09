@@ -7,8 +7,10 @@ import { expect, vi } from "vite-plus/test";
 import {
   createJudeSession,
   formatJudeAppName,
+  getJudeSessionsSnapshot,
   issueJudeT3Pairing,
-  judeAppNameForConnection,
+  judeSessionDisplayName,
+  judeSessionNameForConnection,
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
@@ -33,11 +35,11 @@ describe("Jude discovery", () => {
     ).toBeNull();
   });
 
-  it("resolves the Jude app for an environment connection", () => {
+  it("resolves the Jude environment name from its prompt", () => {
     const sessions = [
       {
         id: "admin-fix-search",
-        name: "Fix search",
+        name: "admin-fix-search",
         prompt: "Fix search",
         project: "admin-v2",
         status: "ready" as const,
@@ -46,8 +48,9 @@ describe("Jude discovery", () => {
     ];
 
     expect(judeSessionIdFromConnectionId("jude:admin-fix-search")).toBe("admin-fix-search");
-    expect(judeAppNameForConnection("jude:admin-fix-search", sessions)).toBe("Admin v2");
-    expect(judeAppNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
+    expect(judeSessionDisplayName(sessions[0]!)).toBe("Fix search");
+    expect(judeSessionNameForConnection("jude:admin-fix-search", sessions)).toBe("Fix search");
+    expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
   });
 
   it("notifies the platform when a manual refresh is requested", () => {
@@ -69,7 +72,8 @@ describe("Jude discovery", () => {
           sessions: [
             {
               id: "admin-fix-search",
-              name: "Fix search",
+              name: "admin-fix-search",
+              visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
               prompt: "Fix search",
               project: "admin-v2",
               status: "ready",
@@ -83,7 +87,8 @@ describe("Jude discovery", () => {
       expect(yield* listJudeSessions(fetch)).toEqual([
         {
           id: "admin-fix-search",
-          name: "Fix search",
+          name: "admin-fix-search",
+          visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
           prompt: "Fix search",
           project: "admin-v2",
           status: "ready",
@@ -151,6 +156,11 @@ describe("Jude discovery", () => {
       };
       expect(yield* createJudeSession(input, fetch)).toMatchObject({
         id: "website-improve-search",
+        status: "provisioning",
+      });
+      expect(getJudeSessionsSnapshot()[0]).toMatchObject({
+        id: "website-improve-search",
+        prompt: "Improve search",
         status: "provisioning",
       });
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {

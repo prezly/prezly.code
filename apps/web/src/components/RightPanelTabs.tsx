@@ -1,6 +1,15 @@
 import type { ContextMenuItem, PreviewSessionSnapshot } from "@t3tools/contracts";
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
-import { Bot, FileDiff, Files, Globe2, Plus, TerminalSquare, X } from "lucide-react";
+import {
+  Bot,
+  ExternalLinkIcon,
+  FileDiff,
+  Files,
+  Globe2,
+  Plus,
+  TerminalSquare,
+  X,
+} from "lucide-react";
 import {
   type MouseEvent as ReactMouseEvent,
   type ReactElement,
@@ -41,6 +50,8 @@ interface RightPanelTabsProps {
   onCloseAllSurfaces: () => void;
   onCopyFilePath: (relativePath: string) => void;
   onAddBrowser: () => void;
+  onAddAttachedPreview: () => void;
+  attachedPreviewUrl: string | null;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -89,6 +100,8 @@ function SurfaceMenuItem(props: {
 
 function RightPanelEmptyState(props: {
   onAddBrowser: () => void;
+  onAddAttachedPreview: () => void;
+  attachedPreviewUrl: string | null;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -98,6 +111,18 @@ function RightPanelEmptyState(props: {
   filesAvailable: boolean;
 }) {
   const actions = [
+    ...(props.attachedPreviewUrl
+      ? [
+          {
+            label: "Preview",
+            description: "Open this Jude environment's attached preview URL in a browser.",
+            icon: ExternalLinkIcon,
+            available: props.browserAvailable,
+            disabledReason: SURFACE_DISABLED_REASONS.browser,
+            onClick: props.onAddAttachedPreview,
+          },
+        ]
+      : []),
     {
       label: "Browser",
       description: "Open a local app or URL.",
@@ -448,6 +473,16 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                   <Plus className="size-3.5" />
                 </MenuTrigger>
                 <MenuPopup align="start" side="bottom" sideOffset={6} className="min-w-44">
+                  {props.attachedPreviewUrl ? (
+                    <SurfaceMenuItem
+                      available={props.browserAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.browser}
+                      onClick={props.onAddAttachedPreview}
+                    >
+                      <ExternalLinkIcon />
+                      Preview
+                    </SurfaceMenuItem>
+                  ) : null}
                   <SurfaceMenuItem
                     available={props.browserAvailable}
                     disabledReason={SURFACE_DISABLED_REASONS.browser}
@@ -491,6 +526,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
         {props.activeSurfaceId === null ? (
           <RightPanelEmptyState
             onAddBrowser={props.onAddBrowser}
+            onAddAttachedPreview={props.onAddAttachedPreview}
+            attachedPreviewUrl={props.attachedPreviewUrl}
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}

@@ -108,12 +108,18 @@ import { openCommandPalette } from "../commandPaletteBus";
 import { openCreateJudeProject } from "../judeProjectBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
-import { judeSessionDetailUrlForConnection, refreshJudeEnvironments } from "../connection/jude";
+import {
+  judeSessionDetailUrlForConnection,
+  judeSessionDisplayName,
+  judeSessionIdFromConnectionId,
+  refreshJudeEnvironments,
+} from "../connection/jude";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
 import { useProjects, useThreadShells } from "../state/entities";
+import { useJudeSessions } from "../hooks/useJudeSessions";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
@@ -1454,6 +1460,7 @@ export default function Sidebar() {
     }
   }, []);
   const { environments } = useEnvironments();
+  const judeSessions = useJudeSessions();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
@@ -1542,6 +1549,27 @@ export default function Sidebar() {
     () => sortLogicalProjectsForSidebar(unsortedProjectGroups, threads, sidebarProjectSortOrder),
     [sidebarProjectSortOrder, threads, unsortedProjectGroups],
   );
+  const managedJudeProjectRows = useMemo(() => {
+    if (!PRODUCT_CAPABILITIES.managedProjects) return [];
+    const environmentBySessionId = new Map(
+      environments.flatMap((environment) => {
+        const connectionId =
+          environment.entry.target._tag === "BearerConnectionTarget"
+            ? environment.entry.target.connectionId
+            : null;
+        const sessionId = judeSessionIdFromConnectionId(connectionId);
+        return sessionId ? ([[sessionId, environment]] as const) : [];
+      }),
+    );
+    return judeSessions.map((session) => {
+      const environment = environmentBySessionId.get(session.id) ?? null;
+      const project = environment
+        ? (projects.find((candidate) => candidate.environmentId === environment.environmentId) ??
+          null)
+        : null;
+      return { session, project };
+    });
+  }, [environments, judeSessions, projects]);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
   const providerEntryByInstanceId = useMemo(
     () =>
@@ -3153,14 +3181,69 @@ export default function Sidebar() {
               </div>
             </div>
             {PRODUCT_CAPABILITIES.managedProjects ? (
-              <SidebarMenuButton
-                type="button"
-                onClick={openCreateJudeProject}
-                className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-              >
-                <FolderPlusIcon className="size-4 shrink-0" />
-                <span>Create project</span>
-              </SidebarMenuButton>
+              <div className="flex flex-col gap-px">
+                <SidebarMenuButton
+                  type="button"
+                  onClick={openCreateJudeProject}
+                  className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                >
+                  <FolderPlusIcon className="size-4 shrink-0" />
+                  <span>Create project</span>
+                </SidebarMenuButton>
+                {managedJudeProjectRows.map(({ session, project }) => {
+                  const displayName = judeSessionDisplayName(session);
+                  if (project) {
+                    return (
+                      <SidebarMenuButton
+                        key={session.id}
+                        type="button"
+                        onClick={() => {
+                          void newThreadContext.handleNewThread(
+                            scopeProjectRef(project.environmentId, project.id),
+                          );
+                          if (isMobile) setOpenMobile(false);
+                        }}
+                        className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                        title={`New prompt in ${displayName}`}
+                      >
+                        <ProjectFavicon
+                          environmentId={project.environmentId}
+                          cwd={project.workspaceRoot}
+                          className="size-4 shrink-0"
+                        />
+                        <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                      </SidebarMenuButton>
+                    );
+                  }
+                  const statusLabel =
+                    session.status === "failed"
+                      ? "Failed"
+                      : session.status === "ready"
+                        ? "Connecting…"
+                        : session.status === "deleting"
+                          ? "Deleting…"
+                          : "Provisioning…";
+                  return (
+                    <SidebarMenuButton
+                      key={session.id}
+                      type="button"
+                      disabled
+                      aria-label={`${displayName}, ${statusLabel}`}
+                      className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] disabled:opacity-100"
+                    >
+                      {session.status === "failed" ? (
+                        <CircleAlertIcon className="size-4 shrink-0 text-destructive" />
+                      ) : (
+                        <CircleDashedIcon className="size-4 shrink-0 text-muted-foreground" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        {statusLabel}
+                      </span>
+                    </SidebarMenuButton>
+                  );
+                })}
+              </div>
             ) : null}
             {projectGroups.length > 0 ? (
               <div className="flex items-center gap-1">

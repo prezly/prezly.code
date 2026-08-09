@@ -13,6 +13,7 @@ const JudeSessionStatus = Schema.Literals([
 const JudeSessionSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
+  visitUrl: Schema.optional(Schema.String),
   prompt: Schema.String,
   project: Schema.String,
   status: JudeSessionStatus,
@@ -93,17 +94,29 @@ export function formatJudeAppName(project: string): string {
   return JUDE_APP_NAMES[project] ?? project;
 }
 
+export function judeSessionDisplayName(session: JudeSession): string {
+  return session.prompt.trim() || session.name.trim() || formatJudeAppName(session.project);
+}
+
 export function judeSessionIdFromConnectionId(connectionId: string | null): string | null {
   return connectionId?.startsWith("jude:") ? connectionId.slice("jude:".length) : null;
 }
 
-export function judeAppNameForConnection(
+export function judeSessionForConnection(
+  connectionId: string | null,
+  sessions: ReadonlyArray<JudeSession>,
+): JudeSession | null {
+  const sessionId = judeSessionIdFromConnectionId(connectionId);
+  const session = sessionId ? sessions.find((candidate) => candidate.id === sessionId) : undefined;
+  return session ?? null;
+}
+
+export function judeSessionNameForConnection(
   connectionId: string | null,
   sessions: ReadonlyArray<JudeSession>,
 ): string | null {
-  const sessionId = judeSessionIdFromConnectionId(connectionId);
-  const session = sessionId ? sessions.find((candidate) => candidate.id === sessionId) : undefined;
-  return session ? formatJudeAppName(session.project) : null;
+  const session = judeSessionForConnection(connectionId, sessions);
+  return session ? judeSessionDisplayName(session) : null;
 }
 
 export function getJudeSessionsSnapshot(): ReadonlyArray<JudeSession> {
@@ -130,6 +143,13 @@ function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
   judeSessionsSignature = signature;
   judeSessionsSnapshot = sessions;
   for (const listener of judeSessionsListeners) listener();
+}
+
+function publishCreatedJudeSession(session: JudeSession): void {
+  publishJudeSessions([
+    session,
+    ...judeSessionsSnapshot.filter((candidate) => candidate.id !== session.id),
+  ]);
 }
 
 export function judeSessionDetailUrl(judeBaseUrl: string, sessionId: string): string {
@@ -260,9 +280,11 @@ export const createJudeSession = Effect.fn("web.jude.createSession")(function* (
     method: "POST",
     body: input,
   });
-  return yield* decodeJudeSession(body).pipe(
+  const session = yield* decodeJudeSession(body).pipe(
     Effect.mapError((cause) => discoveryError("session creation", cause)),
   );
+  publishCreatedJudeSession(session);
+  return session;
 });
 
 function waitForDelay(delayMs: number, signal?: AbortSignal): Promise<void> {

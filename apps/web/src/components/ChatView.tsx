@@ -232,7 +232,7 @@ import {
 } from "@t3tools/client-runtime/state/threads";
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
-import { judeAppNameForConnection } from "../connection/jude";
+import { judeSessionForConnection, judeSessionNameForConnection } from "../connection/jude";
 import { useJudeSessions } from "../hooks/useJudeSessions";
 import {
   useProject,
@@ -1740,8 +1740,12 @@ function ChatViewContent(props: ChatViewProps) {
     activeEnvironment?.entry.target._tag === "BearerConnectionTarget"
       ? activeEnvironment.entry.target.connectionId
       : null;
+  const activeJudeSession = PRODUCT_CAPABILITIES.managedProjects
+    ? judeSessionForConnection(activeEnvironmentConnectionId, judeSessions)
+    : null;
+  const activeJudeVisitUrl = activeJudeSession?.visitUrl?.trim() || null;
   const headerProjectName = PRODUCT_CAPABILITIES.managedProjects
-    ? (judeAppNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
+    ? (judeSessionNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
       activeProject?.title)
     : activeProject?.title;
   const activeEnvironmentConnectionPhase = activeEnvironment?.connection.phase ?? "available";
@@ -3219,6 +3223,14 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef) return;
     void addBrowserSurface({ threadRef: activeThreadRef, openPreview });
   }, [activeThreadRef, openPreview]);
+  const createAttachedPreviewSurface = useCallback(() => {
+    if (!activeThreadRef || !activeJudeVisitUrl) return;
+    void addBrowserSurface({
+      threadRef: activeThreadRef,
+      openPreview,
+      url: activeJudeVisitUrl,
+    });
+  }, [activeJudeVisitUrl, activeThreadRef, openPreview]);
   const addDiffSurface = useCallback(() => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     useRightPanelStore.getState().open(activeThreadRef, "diff");
@@ -6432,6 +6444,8 @@ function ChatViewContent(props: ChatViewProps) {
           onCloseAllSurfaces={closeAllRightPanelSurfaces}
           onCopyFilePath={copyRightPanelFilePath}
           onAddBrowser={createBrowserSurface}
+          onAddAttachedPreview={createAttachedPreviewSurface}
+          attachedPreviewUrl={activeJudeVisitUrl}
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
@@ -6460,6 +6474,8 @@ function ChatViewContent(props: ChatViewProps) {
             onCloseAllSurfaces={closeAllRightPanelSurfaces}
             onCopyFilePath={copyRightPanelFilePath}
             onAddBrowser={createBrowserSurface}
+            onAddAttachedPreview={createAttachedPreviewSurface}
+            attachedPreviewUrl={activeJudeVisitUrl}
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}

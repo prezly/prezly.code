@@ -3,6 +3,7 @@ import { type FormEvent, useEffect, useState } from "react";
 import * as Effect from "effect/Effect";
 
 import {
+  judeSessionDisplayName,
   listJudeGitHubIdentities,
   listJudeModels,
   provisionJudeProject,
@@ -70,7 +71,7 @@ export function JudeCreateProjectDialog() {
   const [customLicenses, setCustomLicenses] = useState("");
   const [identities, setIdentities] = useState<ReadonlyArray<JudeGitHubIdentity>>([]);
   const [models, setModels] = useState<ReadonlyArray<JudeModel>>([]);
-  const [status, setStatus] = useState<"idle" | "creating" | "provisioning">("idle");
+  const [status, setStatus] = useState<"idle" | "creating">("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = status !== "idle";
   const canSubmit = name.trim().length > 0 && baseRef.trim().length > 0 && !busy;
@@ -106,6 +107,7 @@ export function JudeCreateProjectDialog() {
     if (!canSubmit) return;
     setError(null);
     setStatus("creating");
+    let acceptedByJude = false;
     try {
       const session = await provisionJudeProject(
         {
@@ -118,21 +120,43 @@ export function JudeCreateProjectDialog() {
             ? { customLicenses: parseLicenseIds(customLicenses) }
             : {}),
         },
-        { onCreated: () => setStatus("provisioning") },
+        {
+          onCreated: (created) => {
+            acceptedByJude = true;
+            setOpen(false);
+            setStatus("idle");
+            setName("");
+            toastManager.add(
+              stackedThreadToast({
+                type: "success",
+                title: "Creating project",
+                description: `${created.prompt} is provisioning in Jude and is now visible in the sidebar.`,
+              }),
+            );
+          },
+        },
       );
-      setOpen(false);
-      setStatus("idle");
-      setName("");
       toastManager.add(
         stackedThreadToast({
           type: "success",
           title: "Project ready",
-          description: `${session.name} is connecting and will appear in the new prompt project picker.`,
+          description: `${judeSessionDisplayName(session)} is connected and ready to use.`,
         }),
       );
     } catch (cause) {
       setStatus("idle");
-      setError(cause instanceof Error ? cause.message : "Could not create the Jude project.");
+      const message = cause instanceof Error ? cause.message : "Could not create the Jude project.";
+      if (acceptedByJude) {
+        toastManager.add(
+          stackedThreadToast({
+            type: "error",
+            title: "Jude project provisioning failed",
+            description: message,
+          }),
+        );
+      } else {
+        setError(message);
+      }
     }
   }
 
@@ -275,10 +299,8 @@ export function JudeCreateProjectDialog() {
             ) : null}
             {busy ? (
               <div className="flex items-center gap-2 text-muted-foreground text-sm">
-                <GitBranchIcon className="size-4 animate-pulse" />
-                {status === "creating"
-                  ? "Creating the Jude environment…"
-                  : "Waiting for Jude to finish provisioning…"}
+                <GitBranchIcon className="size-4" />
+                Creating the Jude environment…
               </div>
             ) : null}
           </div>

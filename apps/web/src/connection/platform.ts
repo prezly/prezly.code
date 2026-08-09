@@ -62,6 +62,7 @@ import { connectionStorageLayer } from "./storage";
 import { PRODUCT_PROFILE } from "../branding";
 import {
   issueJudeT3Pairing,
+  judeSessionDisplayName,
   listJudeSessions,
   subscribeToJudeEnvironmentRefresh,
   type JudeSession,
@@ -388,7 +389,7 @@ const loadJudeConnectionRegistration = Effect.fn(
     clientMetadata: clientMetadata(),
   }).pipe(Effect.mapError(mapRemoteEnvironmentError));
   const connectionId = `jude:${session.id}`;
-  const label = session.name.trim() || descriptor.label;
+  const label = judeSessionDisplayName(session) || descriptor.label;
 
   return {
     registration: new BearerConnectionRegistration({
