@@ -78,6 +78,8 @@ export interface CreateJudeSessionInput {
 let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
 let judeSessionsSignature = "[]";
 const judeSessionsListeners = new Set<() => void>();
+let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
+const createdJudeSessionIdsListeners = new Set<() => void>();
 const judeEnvironmentRefreshListeners = new Set<() => void>();
 
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
@@ -128,6 +130,22 @@ export function subscribeToJudeSessions(listener: () => void): () => void {
   return () => judeSessionsListeners.delete(listener);
 }
 
+export function getCreatedJudeSessionIdsSnapshot(): ReadonlyArray<string> {
+  return createdJudeSessionIdsSnapshot;
+}
+
+export function subscribeToCreatedJudeSessionIds(listener: () => void): () => void {
+  createdJudeSessionIdsListeners.add(listener);
+  return () => createdJudeSessionIdsListeners.delete(listener);
+}
+
+export function dismissCreatedJudeSession(sessionId: string): void {
+  const next = createdJudeSessionIdsSnapshot.filter((candidate) => candidate !== sessionId);
+  if (next.length === createdJudeSessionIdsSnapshot.length) return;
+  createdJudeSessionIdsSnapshot = next;
+  for (const listener of createdJudeSessionIdsListeners) listener();
+}
+
 export function requestJudeEnvironmentRefresh(): void {
   for (const listener of judeEnvironmentRefreshListeners) listener();
 }
@@ -146,6 +164,11 @@ function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
 }
 
 function publishCreatedJudeSession(session: JudeSession): void {
+  createdJudeSessionIdsSnapshot = [
+    session.id,
+    ...createdJudeSessionIdsSnapshot.filter((candidate) => candidate !== session.id),
+  ];
+  for (const listener of createdJudeSessionIdsListeners) listener();
   publishJudeSessions([
     session,
     ...judeSessionsSnapshot.filter((candidate) => candidate.id !== session.id),

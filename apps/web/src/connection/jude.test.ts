@@ -6,7 +6,9 @@ import { expect, vi } from "vite-plus/test";
 
 import {
   createJudeSession,
+  dismissCreatedJudeSession,
   formatJudeAppName,
+  getCreatedJudeSessionIdsSnapshot,
   getJudeSessionsSnapshot,
   issueJudeT3Pairing,
   judeSessionDisplayName,
@@ -67,6 +69,7 @@ describe("Jude discovery", () => {
 
   it.effect("reads the authoritative session list", () =>
     Effect.gen(function* () {
+      const createdSessionIdsBeforeDiscovery = getCreatedJudeSessionIdsSnapshot();
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         Response.json({
           sessions: [
@@ -95,6 +98,7 @@ describe("Jude discovery", () => {
           urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
         },
       ]);
+      expect(getCreatedJudeSessionIdsSnapshot()).toBe(createdSessionIdsBeforeDiscovery);
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
     }),
   );
@@ -163,6 +167,9 @@ describe("Jude discovery", () => {
         prompt: "Improve search",
         status: "provisioning",
       });
+      expect(getCreatedJudeSessionIdsSnapshot()).toContain("website-improve-search");
+      dismissCreatedJudeSession("website-improve-search");
+      expect(getCreatedJudeSessionIdsSnapshot()).not.toContain("website-improve-search");
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },

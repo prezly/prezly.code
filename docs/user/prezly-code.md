@@ -5,10 +5,12 @@ screen, or the command palette. Select the repository, branch, GitHub identity, 
 new Jude environment. Prezly projects can also include optional custom license IDs.
 
 Once Jude accepts the environment, Prezly.code closes the dialog and immediately shows the app name
-in the left sidebar with its provisioning status. The project becomes interactive as soon as it is
-ready and connected, and the same app name appears in thread breadcrumbs. If provisioning fails or
-takes longer than 15 minutes, the sidebar reports the failure; the environment can still be picked
-up later with **Refresh Jude environments**.
+in the left sidebar with its provisioning status. Only environments created in the running app get
+this temporary row; existing Jude environments remain in the project picker. The row becomes
+interactive as soon as the project connects and is dismissed after it opens a new prompt. The same
+app name appears in thread breadcrumbs. If provisioning fails or takes longer than 15 minutes, the
+sidebar reports the failure; the environment can still be picked up later with **Refresh Jude
+environments**.
 
 When Jude supplies a preview URL, choose **Preview** from the right panel to open the environment's
 attached preview in a browser surface.

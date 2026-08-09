@@ -109,6 +109,7 @@ import { openCreateJudeProject } from "../judeProjectBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import {
+  dismissCreatedJudeSession,
   judeSessionDetailUrlForConnection,
   judeSessionDisplayName,
   judeSessionIdFromConnectionId,
@@ -119,7 +120,7 @@ import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
 import { useProjects, useThreadShells } from "../state/entities";
-import { useJudeSessions } from "../hooks/useJudeSessions";
+import { useCreatedJudeSessionIds, useJudeSessions } from "../hooks/useJudeSessions";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
@@ -1461,6 +1462,7 @@ export default function Sidebar() {
   }, []);
   const { environments } = useEnvironments();
   const judeSessions = useJudeSessions();
+  const createdJudeSessionIds = useCreatedJudeSessionIds();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
@@ -1561,15 +1563,17 @@ export default function Sidebar() {
         return sessionId ? ([[sessionId, environment]] as const) : [];
       }),
     );
-    return judeSessions.map((session) => {
+    return createdJudeSessionIds.flatMap((sessionId) => {
+      const session = judeSessions.find((candidate) => candidate.id === sessionId);
+      if (!session) return [];
       const environment = environmentBySessionId.get(session.id) ?? null;
       const project = environment
         ? (projects.find((candidate) => candidate.environmentId === environment.environmentId) ??
           null)
         : null;
-      return { session, project };
+      return [{ session, project }];
     });
-  }, [environments, judeSessions, projects]);
+  }, [createdJudeSessionIds, environments, judeSessions, projects]);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
   const providerEntryByInstanceId = useMemo(
     () =>
@@ -3198,9 +3202,9 @@ export default function Sidebar() {
                         key={session.id}
                         type="button"
                         onClick={() => {
-                          void newThreadContext.handleNewThread(
-                            scopeProjectRef(project.environmentId, project.id),
-                          );
+                          void newThreadContext
+                            .handleNewThread(scopeProjectRef(project.environmentId, project.id))
+                            .then(() => dismissCreatedJudeSession(session.id));
                           if (isMobile) setOpenMobile(false);
                         }}
                         className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
