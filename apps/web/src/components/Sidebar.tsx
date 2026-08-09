@@ -109,7 +109,7 @@ import {
   judeSessionProjectPickerName,
   refreshJudeEnvironments,
 } from "../connection/jude";
-import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
+import { useClientSettings } from "../hooks/useSettings";
 import { useCopyToClipboard } from "../hooks/useCopyToClipboard";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
@@ -118,6 +118,7 @@ import { useCreatedJudeSessionIds, useJudeSessions } from "../hooks/useJudeSessi
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
+import { previewEnvironment } from "../state/preview";
 import { useEnvironmentQuery } from "../state/query";
 import { useAtomCommand } from "../state/use-atom-command";
 import {
@@ -164,6 +165,7 @@ import {
   type SnoozePreset,
 } from "./Sidebar.snooze";
 import { ProjectFavicon } from "./ProjectFavicon";
+import { addBrowserSurface } from "./preview/addBrowserSurface";
 import { ProviderInstanceIcon } from "./chat/ProviderInstanceIcon";
 import { getTriggerDisplayModelLabel } from "./chat/providerIconUtils";
 import { deriveProviderInstanceEntries, type ProviderInstanceEntry } from "../providerInstances";
@@ -1604,6 +1606,7 @@ export default function Sidebar() {
   const updateThreadMetadata = useAtomCommand(threadEnvironment.updateMetadata, {
     reportFailure: false,
   });
+  const openPreview = useAtomCommand(previewEnvironment.open, { reportFailure: false });
   const { copyToClipboard: copyPathToClipboard } = useCopyToClipboard<{ path: string }>({
     onCopy: ({ path }) => {
       toastManager.add({
@@ -3104,16 +3107,23 @@ export default function Sidebar() {
             }
             return;
           case "open-jude":
-            try {
-              if (judeSessionUrl) {
-                await api.shell.openExternal(judeSessionUrl);
-              }
-            } catch (error) {
-              toastManager.add({
-                type: "error",
-                title: "Could not open Jude",
-                description: error instanceof Error ? error.message : "An error occurred.",
+            if (!judeSessionUrl) return;
+            {
+              const result = await addBrowserSurface({
+                threadRef,
+                openPreview,
+                url: judeSessionUrl,
               });
+              if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+                const error = squashAtomCommandFailure(result);
+                toastManager.add({
+                  type: "error",
+                  title: "Could not open Jude",
+                  description: error instanceof Error ? error.message : "An error occurred.",
+                });
+                return;
+              }
+              if (result._tag === "Success") navigateToThread(threadRef);
             }
             return;
           case "delete": {
@@ -3162,6 +3172,8 @@ export default function Sidebar() {
       handleRefreshJude,
       judeSessionUrlByEnvironmentId,
       markThreadUnread,
+      navigateToThread,
+      openPreview,
       projectCwdByKey,
       serverConfigs,
       startThreadRename,
