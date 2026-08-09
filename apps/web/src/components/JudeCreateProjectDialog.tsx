@@ -1,5 +1,5 @@
 import { GitBranchIcon, PlusIcon } from "lucide-react";
-import { type FormEvent, useEffect, useMemo, useState } from "react";
+import { type FormEvent, useEffect, useState } from "react";
 import * as Effect from "effect/Effect";
 
 import {
@@ -16,7 +16,6 @@ import {
   DialogDescription,
   DialogFooter,
   DialogHeader,
-  DialogPanel,
   DialogPopup,
   DialogTitle,
 } from "~/components/ui/dialog";
@@ -100,10 +99,7 @@ export function JudeCreateProjectDialog() {
     ]);
   }, [identities.length, models.length, open]);
 
-  const selectedModelName = useMemo(
-    () => models.find((candidate) => candidate.id === model)?.name ?? model,
-    [model, models],
-  );
+  const selectedModelName = models.find((candidate) => candidate.id === model)?.name ?? model;
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -148,7 +144,10 @@ export function JudeCreateProjectDialog() {
       }}
     >
       <DialogPopup className="max-w-xl overflow-hidden">
-        <form onSubmit={(event) => void handleSubmit(event)}>
+        <form
+          className="flex min-h-0 flex-col overflow-hidden"
+          onSubmit={(event) => void handleSubmit(event)}
+        >
           <DialogHeader>
             <DialogTitle>Create project</DialogTitle>
             <DialogDescription>
@@ -156,7 +155,10 @@ export function JudeCreateProjectDialog() {
               is ready.
             </DialogDescription>
           </DialogHeader>
-          <DialogPanel className="grid gap-4">
+          <div
+            data-slot="dialog-panel"
+            className="grid min-h-0 flex-1 gap-4 overflow-y-auto px-6 pb-6 pt-1"
+          >
             <div className="grid gap-2">
               <Label htmlFor="jude-project-name">Environment name</Label>
               <Input
@@ -279,14 +281,14 @@ export function JudeCreateProjectDialog() {
                   : "Waiting for Jude to finish provisioning…"}
               </div>
             ) : null}
-          </DialogPanel>
+          </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>
               Cancel
             </Button>
             <Button type="submit" disabled={!canSubmit}>
               <PlusIcon className="size-4" />
-              Create project
+              Create Jude environment
             </Button>
           </DialogFooter>
         </form>
