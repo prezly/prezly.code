@@ -3239,17 +3239,22 @@ function ChatViewContent(props: ChatViewProps) {
     });
   }, [activeJudeVisitUrl, activeThreadRef, openPreview]);
   const openActiveJudeDetails = useCallback(() => {
-    if (!activeJudeDetailUrl) return;
-    const api = readLocalApi();
-    if (!api) return;
-    void api.shell.openExternal(activeJudeDetailUrl).catch((error: unknown) => {
-      toastManager.add({
-        type: "error",
-        title: "Could not open Jude",
-        description: error instanceof Error ? error.message : "An error occurred.",
-      });
+    if (!activeThreadRef || !activeJudeDetailUrl) return;
+    void addBrowserSurface({
+      threadRef: activeThreadRef,
+      openPreview,
+      url: activeJudeDetailUrl,
+    }).then((result) => {
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add({
+          type: "error",
+          title: "Could not open Jude",
+          description: error instanceof Error ? error.message : "An error occurred.",
+        });
+      }
     });
-  }, [activeJudeDetailUrl]);
+  }, [activeJudeDetailUrl, activeThreadRef, openPreview]);
   const addDiffSurface = useCallback(() => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     useRightPanelStore.getState().open(activeThreadRef, "diff");

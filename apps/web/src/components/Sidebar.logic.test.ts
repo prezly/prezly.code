@@ -10,7 +10,7 @@ import {
   getFallbackThreadIdAfterDelete,
   getVisibleThreadsForProject,
   getProjectSortTimestamp,
-  hasThreadForProject,
+  hasUserPromptForProject,
   hasUnseenCompletion,
   isManagedPlaceholderThread,
   isContextMenuPointerDown,
@@ -56,17 +56,38 @@ const localEnvironmentId = EnvironmentId.make("environment-local");
 describe("created project visibility", () => {
   const project = { environmentId: "environment-jude", id: "project-jude" };
 
-  it("keeps a project visible until it has a durable thread", () => {
-    expect(hasThreadForProject(project, [])).toBe(false);
+  it("keeps a project visible until one of its threads has a user prompt", () => {
+    expect(hasUserPromptForProject(project, [])).toBe(false);
     expect(
-      hasThreadForProject(project, [
-        { environmentId: "environment-other", projectId: "project-jude" },
-        { environmentId: "environment-jude", projectId: "project-other" },
+      hasUserPromptForProject(project, [
+        {
+          environmentId: "environment-other",
+          projectId: "project-jude",
+          latestUserMessageAt: "2026-08-09T20:00:00.000Z",
+        },
+        {
+          environmentId: "environment-jude",
+          projectId: "project-other",
+          latestUserMessageAt: "2026-08-09T20:00:00.000Z",
+        },
       ]),
     ).toBe(false);
     expect(
-      hasThreadForProject(project, [
-        { environmentId: "environment-jude", projectId: "project-jude" },
+      hasUserPromptForProject(project, [
+        {
+          environmentId: "environment-jude",
+          projectId: "project-jude",
+          latestUserMessageAt: null,
+        },
+      ]),
+    ).toBe(false);
+    expect(
+      hasUserPromptForProject(project, [
+        {
+          environmentId: "environment-jude",
+          projectId: "project-jude",
+          latestUserMessageAt: "2026-08-09T20:00:00.000Z",
+        },
       ]),
     ).toBe(true);
   });

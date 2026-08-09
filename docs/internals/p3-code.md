@@ -10,7 +10,7 @@ thread, and orchestration internals while replacing local environment management
   and does not limit users to one prompt.
 - Jude is the authority for the environment list. Sessions created by the running client appear as
   temporary non-interactive sidebar rows, become interactive when their T3 project connects, and
-  are dismissed after the first submitted prompt creates a durable thread. Previously discovered
+  are dismissed after a thread records its first user prompt. Previously discovered
   sessions stay in the project picker instead of being duplicated as top-level sidebar rows.
 - P3 does not create local environments, directories, or T3 worktrees. Its **Create project** flow
   provisions a Jude session, publishes it to the client snapshot, waits for it to become ready, and
