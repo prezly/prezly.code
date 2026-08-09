@@ -100,3 +100,49 @@ product decisions, and the build/release configuration needed by Prezlians.
 
 The upstream project is open source. Its original license and notices remain in
 this repository.
+
+## Documentation
+
+Full docs live in [docs/](./docs). There's no docs site yet.
+
+- [Install and first run](./docs/user/install.md)
+- [Permission modes](./docs/user/permission-modes.md)
+- [Keyboard shortcuts](./docs/user/keybindings.md)
+- [Customize a project icon](./docs/user/project-settings.md)
+- [Remote access from a phone or another machine](./docs/user/remote-access.md)
+- [Keeping app and server in sync](./docs/user/updating.md)
+- [Source control integrations](./docs/user/source-control.md)
+- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
+- Linux: [run T3 Code as a background service](./docs/user/background-service.md)
+
+Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
+
+## If you REALLY want to contribute still.... read this first
+
+### Install `vp`
+
+T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
+
+#### macOS / Linux
+
+```bash
+curl -fsSL https://vite.plus | bash
+```
+
+#### Windows
+
+```bash
+irm https://vite.plus/ps1 | iex
+```
+
+Checkout their getting started guide for more information: https://viteplus.dev/guide/
+
+### Install dependencies
+
+```bash
+vp i
+```
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
+
+Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).
