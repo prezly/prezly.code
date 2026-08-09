@@ -105,6 +105,7 @@ import { useThreadSelectionStore } from "../threadSelectionStore";
 import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
+import { openCreateJudeProject } from "../judeProjectBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import { judeSessionDetailUrlForConnection, refreshJudeEnvironments } from "../connection/jude";
@@ -3151,6 +3152,16 @@ export default function Sidebar() {
                 </Tooltip>
               </div>
             </div>
+            {PRODUCT_CAPABILITIES.managedProjects ? (
+              <SidebarMenuButton
+                type="button"
+                onClick={openCreateJudeProject}
+                className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+              >
+                <FolderPlusIcon className="size-4 shrink-0" />
+                <span>Create project</span>
+              </SidebarMenuButton>
+            ) : null}
             {projectGroups.length > 0 ? (
               <div className="flex items-center gap-1">
                 <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>
