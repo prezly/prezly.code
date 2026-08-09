@@ -13,6 +13,7 @@ import {
   issueJudeT3Pairing,
   judeSessionDisplayName,
   judeSessionNameForConnection,
+  judeSessionProjectPickerName,
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
@@ -51,6 +52,7 @@ describe("Jude discovery", () => {
 
     expect(judeSessionIdFromConnectionId("jude:admin-fix-search")).toBe("admin-fix-search");
     expect(judeSessionDisplayName(sessions[0]!)).toBe("Fix search");
+    expect(judeSessionProjectPickerName(sessions[0]!)).toBe("Admin v2 · Fix search");
     expect(judeSessionNameForConnection("jude:admin-fix-search", sessions)).toBe("Fix search");
     expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
   });

@@ -10,14 +10,15 @@ thread, and orchestration internals while replacing local environment management
   and does not limit users to one prompt.
 - Jude is the authority for the environment list. Sessions created by the running client appear as
   temporary non-interactive sidebar rows, become interactive when their T3 project connects, and
-  are dismissed after opening a new prompt. Previously discovered sessions stay in the project
-  picker instead of being duplicated as top-level sidebar rows.
+  are dismissed after the first submitted prompt creates a durable thread. Previously discovered
+  sessions stay in the project picker instead of being duplicated as top-level sidebar rows.
 - P3 does not create local environments, directories, or T3 worktrees. Its **Create project** flow
   provisions a Jude session, publishes it to the client snapshot, waits for it to become ready, and
   then refreshes the managed project list. The Jude session itself provides the isolated checkout.
-- P3 uses the Jude session prompt as the user-facing project name in the sidebar and thread
-  breadcrumbs. When Jude exposes a `visitUrl`, P3 offers it as an attached **Preview** browser
-  surface in the right panel.
+- P3 uses the Jude session prompt as the user-facing environment name in the sidebar and thread
+  breadcrumbs. The project picker prefixes that name with the Jude app. When Jude exposes a
+  `visitUrl`, P3 offers it as an attached **Preview** browser surface in the right panel; the panel
+  also links to the environment's Jude session details.
 - P3 currently relies on network access through Warp. There is no Jude user authentication or
   user-scoped discovery yet.
 

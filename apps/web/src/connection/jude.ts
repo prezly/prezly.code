@@ -100,6 +100,10 @@ export function judeSessionDisplayName(session: JudeSession): string {
   return session.prompt.trim() || session.name.trim() || formatJudeAppName(session.project);
 }
 
+export function judeSessionProjectPickerName(session: JudeSession): string {
+  return `${formatJudeAppName(session.project)} · ${judeSessionDisplayName(session)}`;
+}
+
 export function judeSessionIdFromConnectionId(connectionId: string | null): string | null {
   return connectionId?.startsWith("jude:") ? connectionId.slice("jude:".length) : null;
 }

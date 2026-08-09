@@ -113,6 +113,7 @@ import {
   judeSessionDetailUrlForConnection,
   judeSessionDisplayName,
   judeSessionIdFromConnectionId,
+  judeSessionProjectPickerName,
   refreshJudeEnvironments,
 } from "../connection/jude";
 import { useClientSettings, useUpdateClientSettings } from "../hooks/useSettings";
@@ -140,6 +141,7 @@ import {
   buildBulkTitleRegenerationContextMenuItem,
   formatWorkingDurationLabel,
   firstValidTimestampMs,
+  hasThreadForProject,
   hasUnseenCompletion,
   isManagedPlaceholderThread,
   isTrailingDoubleClick,
@@ -1551,6 +1553,21 @@ export default function Sidebar() {
     () => sortLogicalProjectsForSidebar(unsortedProjectGroups, threads, sidebarProjectSortOrder),
     [sidebarProjectSortOrder, threads, unsortedProjectGroups],
   );
+  const judeSessionByEnvironmentId = useMemo(() => {
+    if (!PRODUCT_CAPABILITIES.managedProjects) return new Map();
+    const sessionById = new Map(judeSessions.map((session) => [session.id, session] as const));
+    return new Map(
+      environments.flatMap((environment) => {
+        const connectionId =
+          environment.entry.target._tag === "BearerConnectionTarget"
+            ? environment.entry.target.connectionId
+            : null;
+        const sessionId = judeSessionIdFromConnectionId(connectionId);
+        const session = sessionId ? sessionById.get(sessionId) : undefined;
+        return session ? ([[environment.environmentId, session]] as const) : [];
+      }),
+    );
+  }, [environments, judeSessions]);
   const managedJudeProjectRows = useMemo(() => {
     if (!PRODUCT_CAPABILITIES.managedProjects) return [];
     const environmentBySessionId = new Map(
@@ -1574,6 +1591,13 @@ export default function Sidebar() {
       return [{ session, project }];
     });
   }, [createdJudeSessionIds, environments, judeSessions, projects]);
+  useEffect(() => {
+    for (const { session, project } of managedJudeProjectRows) {
+      if (project && hasThreadForProject(project, threads)) {
+        dismissCreatedJudeSession(session.id);
+      }
+    }
+  }, [managedJudeProjectRows, threads]);
   const serverProviders = useAtomValue(primaryServerProvidersAtom);
   const providerEntryByInstanceId = useMemo(
     () =>
@@ -1646,6 +1670,13 @@ export default function Sidebar() {
         ? null
         : (projectGroups.find((project) => project.projectKey === projectScopeKey) ?? null),
     [projectGroups, projectScopeKey],
+  );
+  const projectPickerDisplayName = useCallback(
+    (project: SidebarProjectSnapshot) => {
+      const session = judeSessionByEnvironmentId.get(project.environmentId);
+      return session ? judeSessionProjectPickerName(session) : project.displayName;
+    },
+    [judeSessionByEnvironmentId],
   );
   const scopedProjectKeys = useMemo(
     () =>
@@ -3202,9 +3233,9 @@ export default function Sidebar() {
                         key={session.id}
                         type="button"
                         onClick={() => {
-                          void newThreadContext
-                            .handleNewThread(scopeProjectRef(project.environmentId, project.id))
-                            .then(() => dismissCreatedJudeSession(session.id));
+                          void newThreadContext.handleNewThread(
+                            scopeProjectRef(project.environmentId, project.id),
+                          );
                           if (isMobile) setOpenMobile(false);
                         }}
                         className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
@@ -3270,7 +3301,9 @@ export default function Sidebar() {
                       <FolderIcon className="size-4 shrink-0" />
                     )}
                     <span className="min-w-0 flex-1 truncate">
-                      {scopedProjectGroup?.displayName ?? "All projects"}
+                      {scopedProjectGroup
+                        ? projectPickerDisplayName(scopedProjectGroup)
+                        : "All projects"}
                     </span>
                     <ChevronDownIcon className="-mr-px size-4 shrink-0" />
                   </MenuTrigger>
@@ -3291,6 +3324,7 @@ export default function Sidebar() {
                       </MenuRadioItem>
                       {projectGroups.map((project) => {
                         const scopeKey = project.projectKey;
+                        const pickerDisplayName = projectPickerDisplayName(project);
                         return (
                           <MenuRadioItem
                             key={scopeKey}
@@ -3303,7 +3337,7 @@ export default function Sidebar() {
                               cwd={project.workspaceRoot}
                               className="size-4 shrink-0"
                             />
-                            <span className="min-w-0 truncate text-sm">{project.displayName}</span>
+                            <span className="min-w-0 truncate text-sm">{pickerDisplayName}</span>
                             {PRODUCT_CAPABILITIES.allowProjectManagement ? (
                               <button
                                 type="button"

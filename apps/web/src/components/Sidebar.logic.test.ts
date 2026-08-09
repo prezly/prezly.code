@@ -10,6 +10,7 @@ import {
   getFallbackThreadIdAfterDelete,
   getVisibleThreadsForProject,
   getProjectSortTimestamp,
+  hasThreadForProject,
   hasUnseenCompletion,
   isManagedPlaceholderThread,
   isContextMenuPointerDown,
@@ -51,6 +52,25 @@ import {
 } from "../types";
 
 const localEnvironmentId = EnvironmentId.make("environment-local");
+
+describe("created project visibility", () => {
+  const project = { environmentId: "environment-jude", id: "project-jude" };
+
+  it("keeps a project visible until it has a durable thread", () => {
+    expect(hasThreadForProject(project, [])).toBe(false);
+    expect(
+      hasThreadForProject(project, [
+        { environmentId: "environment-other", projectId: "project-jude" },
+        { environmentId: "environment-jude", projectId: "project-other" },
+      ]),
+    ).toBe(false);
+    expect(
+      hasThreadForProject(project, [
+        { environmentId: "environment-jude", projectId: "project-jude" },
+      ]),
+    ).toBe(true);
+  });
+});
 
 describe("managed placeholder threads", () => {
   const placeholder = {

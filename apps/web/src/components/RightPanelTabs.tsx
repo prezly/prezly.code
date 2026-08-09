@@ -52,6 +52,8 @@ interface RightPanelTabsProps {
   onAddBrowser: () => void;
   onAddAttachedPreview: () => void;
   attachedPreviewUrl: string | null;
+  onOpenJudeDetails: () => void;
+  judeDetailUrl: string | null;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -102,6 +104,8 @@ function RightPanelEmptyState(props: {
   onAddBrowser: () => void;
   onAddAttachedPreview: () => void;
   attachedPreviewUrl: string | null;
+  onOpenJudeDetails: () => void;
+  judeDetailUrl: string | null;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -120,6 +124,18 @@ function RightPanelEmptyState(props: {
             available: props.browserAvailable,
             disabledReason: SURFACE_DISABLED_REASONS.browser,
             onClick: props.onAddAttachedPreview,
+          },
+        ]
+      : []),
+    ...(props.judeDetailUrl
+      ? [
+          {
+            label: "Jude details",
+            description: "Open this environment's session details in Jude.",
+            icon: ExternalLinkIcon,
+            available: true as const,
+            disabledReason: null,
+            onClick: props.onOpenJudeDetails,
           },
         ]
       : []),
@@ -483,6 +499,12 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                       Preview
                     </SurfaceMenuItem>
                   ) : null}
+                  {props.judeDetailUrl ? (
+                    <SurfaceMenuItem available onClick={props.onOpenJudeDetails}>
+                      <ExternalLinkIcon />
+                      Jude details
+                    </SurfaceMenuItem>
+                  ) : null}
                   <SurfaceMenuItem
                     available={props.browserAvailable}
                     disabledReason={SURFACE_DISABLED_REASONS.browser}
@@ -528,6 +550,8 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             onAddBrowser={props.onAddBrowser}
             onAddAttachedPreview={props.onAddAttachedPreview}
             attachedPreviewUrl={props.attachedPreviewUrl}
+            onOpenJudeDetails={props.onOpenJudeDetails}
+            judeDetailUrl={props.judeDetailUrl}
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}

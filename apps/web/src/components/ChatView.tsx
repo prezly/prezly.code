@@ -120,7 +120,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
-import { PRODUCT_CAPABILITIES } from "../branding";
+import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
 import {
@@ -232,7 +232,11 @@ import {
 } from "@t3tools/client-runtime/state/threads";
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
-import { judeSessionForConnection, judeSessionNameForConnection } from "../connection/jude";
+import {
+  judeSessionDetailUrlForConnection,
+  judeSessionForConnection,
+  judeSessionNameForConnection,
+} from "../connection/jude";
 import { useJudeSessions } from "../hooks/useJudeSessions";
 import {
   useProject,
@@ -1744,6 +1748,9 @@ function ChatViewContent(props: ChatViewProps) {
     ? judeSessionForConnection(activeEnvironmentConnectionId, judeSessions)
     : null;
   const activeJudeVisitUrl = activeJudeSession?.visitUrl?.trim() || null;
+  const activeJudeDetailUrl = PRODUCT_PROFILE.judeBaseUrl
+    ? judeSessionDetailUrlForConnection(PRODUCT_PROFILE.judeBaseUrl, activeEnvironmentConnectionId)
+    : null;
   const headerProjectName = PRODUCT_CAPABILITIES.managedProjects
     ? (judeSessionNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
       activeProject?.title)
@@ -3231,6 +3238,18 @@ function ChatViewContent(props: ChatViewProps) {
       url: activeJudeVisitUrl,
     });
   }, [activeJudeVisitUrl, activeThreadRef, openPreview]);
+  const openActiveJudeDetails = useCallback(() => {
+    if (!activeJudeDetailUrl) return;
+    const api = readLocalApi();
+    if (!api) return;
+    void api.shell.openExternal(activeJudeDetailUrl).catch((error: unknown) => {
+      toastManager.add({
+        type: "error",
+        title: "Could not open Jude",
+        description: error instanceof Error ? error.message : "An error occurred.",
+      });
+    });
+  }, [activeJudeDetailUrl]);
   const addDiffSurface = useCallback(() => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     useRightPanelStore.getState().open(activeThreadRef, "diff");
@@ -6446,6 +6465,8 @@ function ChatViewContent(props: ChatViewProps) {
           onAddBrowser={createBrowserSurface}
           onAddAttachedPreview={createAttachedPreviewSurface}
           attachedPreviewUrl={activeJudeVisitUrl}
+          onOpenJudeDetails={openActiveJudeDetails}
+          judeDetailUrl={activeJudeDetailUrl}
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
@@ -6476,6 +6497,8 @@ function ChatViewContent(props: ChatViewProps) {
             onAddBrowser={createBrowserSurface}
             onAddAttachedPreview={createAttachedPreviewSurface}
             attachedPreviewUrl={activeJudeVisitUrl}
+            onOpenJudeDetails={openActiveJudeDetails}
+            judeDetailUrl={activeJudeDetailUrl}
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
