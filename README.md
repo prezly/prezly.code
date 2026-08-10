@@ -36,6 +36,23 @@ Unsigned desktop installers for macOS, Windows, and Linux are published on the
 [Prezly.code Releases page](https://github.com/prezly/prezly.code/releases).
 Each version has its release notes and all platform installers in one place.
 
+### Installing on macOS
+
+The macOS app is not signed with an Apple Developer certificate, so Gatekeeper
+will ask you to approve it the first time you open it:
+
+1. Download the DMG for your Mac from the Releases page, open it, and drag
+   **Prezly.code** into **Applications**.
+2. In Finder, open **Applications**, Control-click **Prezly.code**, and choose
+   **Open**.
+3. Choose **Open** again in the warning. macOS remembers this approval for later
+   launches.
+
+If **Open** is not offered, try to launch the app once, then go to **System
+Settings → Privacy & Security**, scroll to **Security**, and click **Open
+Anyway** for Prezly.code. Only approve copies downloaded from the official
+Prezly.code Releases page linked above.
+
 ## Building locally
 
 Install the repository's Vite+ toolchain and dependencies, then build the P3
