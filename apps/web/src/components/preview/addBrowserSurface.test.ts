@@ -49,4 +49,23 @@ describe("addBrowserSurface", () => {
       ).surfaces.map((surface) => surface.id),
     ).toEqual(["browser:tab-1", "browser:tab-2"]);
   });
+
+  it("opens an attached preview URL in the new browser surface", async () => {
+    const preview = snapshot("tab-preview");
+    const openPreview = vi.fn(async (_input: PreviewOpenInput) => AsyncResult.success(preview));
+
+    await addBrowserSurface({
+      threadRef,
+      openPreview: ({ input }) => openPreview(input),
+      url: "https://preview.example.com",
+    });
+
+    expect(openPreview).toHaveBeenCalledWith({
+      threadId: "thread-1",
+      url: "https://preview.example.com",
+    });
+    expect(
+      selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, threadRef).surfaces,
+    ).toEqual([{ id: "browser:tab-preview", kind: "preview", resourceId: "tab-preview" }]);
+  });
 });

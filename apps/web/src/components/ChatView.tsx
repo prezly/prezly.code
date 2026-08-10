@@ -120,7 +120,7 @@ import { useTheme } from "../hooks/useTheme";
 import { useTurnDiffSummaries } from "../hooks/useTurnDiffSummaries";
 import { isCommandPaletteOpen } from "../commandPaletteBus";
 import { buildTemporaryWorktreeBranchName } from "@t3tools/shared/git";
-import { PRODUCT_CAPABILITIES } from "../branding";
+import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import { useMediaQuery } from "../hooks/useMediaQuery";
 import { RIGHT_PANEL_INLINE_LAYOUT_MEDIA_QUERY } from "../rightPanelLayout";
 import {
@@ -232,7 +232,11 @@ import {
 } from "@t3tools/client-runtime/state/threads";
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
-import { judeAppNameForConnection } from "../connection/jude";
+import {
+  judeSessionDetailUrlForConnection,
+  judeSessionForConnection,
+  judeSessionNameForConnection,
+} from "../connection/jude";
 import { useJudeSessions } from "../hooks/useJudeSessions";
 import {
   useProject,
@@ -1740,8 +1744,15 @@ function ChatViewContent(props: ChatViewProps) {
     activeEnvironment?.entry.target._tag === "BearerConnectionTarget"
       ? activeEnvironment.entry.target.connectionId
       : null;
+  const activeJudeSession = PRODUCT_CAPABILITIES.managedProjects
+    ? judeSessionForConnection(activeEnvironmentConnectionId, judeSessions)
+    : null;
+  const activeJudeVisitUrl = activeJudeSession?.visitUrl?.trim() || null;
+  const activeJudeDetailUrl = PRODUCT_PROFILE.judeBaseUrl
+    ? judeSessionDetailUrlForConnection(PRODUCT_PROFILE.judeBaseUrl, activeEnvironmentConnectionId)
+    : null;
   const headerProjectName = PRODUCT_CAPABILITIES.managedProjects
-    ? (judeAppNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
+    ? (judeSessionNameForConnection(activeEnvironmentConnectionId, judeSessions) ??
       activeProject?.title)
     : activeProject?.title;
   const activeEnvironmentConnectionPhase = activeEnvironment?.connection.phase ?? "available";
@@ -2611,6 +2622,7 @@ function ChatViewContent(props: ChatViewProps) {
   const visibleProviderStatus = shouldShowProviderStatusBanner(
     activeProviderStatus,
     dismissedProviderStatusBannerKey,
+    activeThread?.session ?? null,
   )
     ? activeProviderStatus
     : null;
@@ -3219,6 +3231,31 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef) return;
     void addBrowserSurface({ threadRef: activeThreadRef, openPreview });
   }, [activeThreadRef, openPreview]);
+  const createAttachedPreviewSurface = useCallback(() => {
+    if (!activeThreadRef || !activeJudeVisitUrl) return;
+    void addBrowserSurface({
+      threadRef: activeThreadRef,
+      openPreview,
+      url: activeJudeVisitUrl,
+    });
+  }, [activeJudeVisitUrl, activeThreadRef, openPreview]);
+  const openActiveJudeDetails = useCallback(() => {
+    if (!activeThreadRef || !activeJudeDetailUrl) return;
+    void addBrowserSurface({
+      threadRef: activeThreadRef,
+      openPreview,
+      url: activeJudeDetailUrl,
+    }).then((result) => {
+      if (result._tag === "Failure" && !isAtomCommandInterrupted(result)) {
+        const error = squashAtomCommandFailure(result);
+        toastManager.add({
+          type: "error",
+          title: "Could not open Jude",
+          description: error instanceof Error ? error.message : "An error occurred.",
+        });
+      }
+    });
+  }, [activeJudeDetailUrl, activeThreadRef, openPreview]);
   const addDiffSurface = useCallback(() => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     useRightPanelStore.getState().open(activeThreadRef, "diff");
@@ -5933,6 +5970,11 @@ function ChatViewContent(props: ChatViewProps) {
       rightPanelAvailable={activeProject !== null}
       rightPanelOpen={rightPanelOpen}
       rightPanelShortcutLabel={shortcutLabelForCommand(keybindings, "rightPanel.toggle")}
+      // Suppressed while the Agents surface is visible: the roster itself is
+      // on screen, so the toggle badge would be pointing at nothing.
+      liveAgentCount={
+        rightPanelOpen && activeRightPanelSurface?.kind === "agents" ? 0 : agentPanelModel.liveCount
+      }
       onToggleTerminal={toggleTerminalVisibility}
       onToggleRightPanel={toggleRightPanel}
     />
@@ -6063,6 +6105,7 @@ function ChatViewContent(props: ChatViewProps) {
             changeRequestState={activeThreadPr?.state ?? null}
             activeProjectName={headerProjectName}
             activeProjectCwd={activeProject?.workspaceRoot ?? null}
+            activeProjectFaviconPath={activeProject?.faviconPath ?? null}
             openInCwd={gitCwd}
             activeProjectScripts={activeProject?.scripts}
             preferredScriptId={
@@ -6432,6 +6475,10 @@ function ChatViewContent(props: ChatViewProps) {
           onCloseAllSurfaces={closeAllRightPanelSurfaces}
           onCopyFilePath={copyRightPanelFilePath}
           onAddBrowser={createBrowserSurface}
+          onAddAttachedPreview={createAttachedPreviewSurface}
+          attachedPreviewUrl={activeJudeVisitUrl}
+          onOpenJudeDetails={openActiveJudeDetails}
+          judeDetailUrl={activeJudeDetailUrl}
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
@@ -6439,6 +6486,7 @@ function ChatViewContent(props: ChatViewProps) {
           browserAvailable={isPreviewSupportedInRuntime()}
           diffAvailable={isServerThread && isGitRepo}
           filesAvailable={activeProject !== null}
+          liveAgentCount={agentPanelModel.liveCount}
         >
           {rightPanelContent}
         </RightPanelTabs>
@@ -6460,6 +6508,10 @@ function ChatViewContent(props: ChatViewProps) {
             onCloseAllSurfaces={closeAllRightPanelSurfaces}
             onCopyFilePath={copyRightPanelFilePath}
             onAddBrowser={createBrowserSurface}
+            onAddAttachedPreview={createAttachedPreviewSurface}
+            attachedPreviewUrl={activeJudeVisitUrl}
+            onOpenJudeDetails={openActiveJudeDetails}
+            judeDetailUrl={activeJudeDetailUrl}
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
@@ -6467,6 +6519,7 @@ function ChatViewContent(props: ChatViewProps) {
             browserAvailable={isPreviewSupportedInRuntime()}
             diffAvailable={isServerThread && isGitRepo}
             filesAvailable={activeProject !== null}
+            liveAgentCount={agentPanelModel.liveCount}
           >
             {rightPanelContent}
           </RightPanelTabs>

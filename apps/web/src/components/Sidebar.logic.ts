@@ -23,6 +23,22 @@ export const THREAD_JUMP_HINT_SHOW_DELAY_MS = 100;
 // it small; cold opens still render instantly from the cached snapshot.
 export const SIDEBAR_THREAD_PREWARM_LIMIT = 3;
 
+export function hasUserPromptForProject(
+  project: { readonly environmentId: string; readonly id: string },
+  threads: ReadonlyArray<{
+    readonly environmentId: string;
+    readonly projectId: string;
+    readonly latestUserMessageAt: string | null;
+  }>,
+): boolean {
+  return threads.some(
+    (thread) =>
+      thread.environmentId === project.environmentId &&
+      thread.projectId === project.id &&
+      thread.latestUserMessageAt !== null,
+  );
+}
+
 export function isManagedPlaceholderThread(
   thread: Pick<
     SidebarThreadSummary,

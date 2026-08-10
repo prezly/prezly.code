@@ -5,13 +5,20 @@ import * as Effect from "effect/Effect";
 import { expect, vi } from "vite-plus/test";
 
 import {
+  createJudeSession,
+  dismissCreatedJudeSession,
   formatJudeAppName,
+  getCreatedJudeSessionIdsSnapshot,
+  getJudeSessionsSnapshot,
   issueJudeT3Pairing,
-  judeAppNameForConnection,
+  judeSessionDisplayName,
+  judeSessionNameForConnection,
+  judeSessionProjectPickerName,
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
   listJudeSessions,
+  provisionJudeProject,
   requestJudeEnvironmentRefresh,
   subscribeToJudeEnvironmentRefresh,
 } from "./jude.ts";
@@ -31,11 +38,11 @@ describe("Jude discovery", () => {
     ).toBeNull();
   });
 
-  it("resolves the Jude app for an environment connection", () => {
+  it("resolves the Jude environment name from its prompt", () => {
     const sessions = [
       {
         id: "admin-fix-search",
-        name: "Fix search",
+        name: "admin-fix-search",
         prompt: "Fix search",
         project: "admin-v2",
         status: "ready" as const,
@@ -44,8 +51,10 @@ describe("Jude discovery", () => {
     ];
 
     expect(judeSessionIdFromConnectionId("jude:admin-fix-search")).toBe("admin-fix-search");
-    expect(judeAppNameForConnection("jude:admin-fix-search", sessions)).toBe("Admin v2");
-    expect(judeAppNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
+    expect(judeSessionDisplayName(sessions[0]!)).toBe("Fix search");
+    expect(judeSessionProjectPickerName(sessions[0]!)).toBe("Admin v2 · Fix search");
+    expect(judeSessionNameForConnection("jude:admin-fix-search", sessions)).toBe("Fix search");
+    expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
   });
 
   it("notifies the platform when a manual refresh is requested", () => {
@@ -62,12 +71,14 @@ describe("Jude discovery", () => {
 
   it.effect("reads the authoritative session list", () =>
     Effect.gen(function* () {
+      const createdSessionIdsBeforeDiscovery = getCreatedJudeSessionIdsSnapshot();
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         Response.json({
           sessions: [
             {
               id: "admin-fix-search",
-              name: "Fix search",
+              name: "admin-fix-search",
+              visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
               prompt: "Fix search",
               project: "admin-v2",
               status: "ready",
@@ -81,13 +92,15 @@ describe("Jude discovery", () => {
       expect(yield* listJudeSessions(fetch)).toEqual([
         {
           id: "admin-fix-search",
-          name: "Fix search",
+          name: "admin-fix-search",
+          visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
           prompt: "Fix search",
           project: "admin-v2",
           status: "ready",
           urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
         },
       ]);
+      expect(getCreatedJudeSessionIdsSnapshot()).toBe(createdSessionIdsBeforeDiscovery);
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
     }),
   );
@@ -123,6 +136,86 @@ describe("Jude discovery", () => {
       });
     }),
   );
+
+  it.effect("creates a Jude session with the selected project settings", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json(
+          {
+            id: "website-improve-search",
+            name: "Improve search",
+            prompt: "Improve search",
+            project: "website",
+            status: "provisioning",
+            urls: { t3: "" },
+          },
+          { status: 201 },
+        ),
+      );
+
+      const input = {
+        prompt: "Improve search",
+        project: "website",
+        model: "gpt-5.6-sol",
+        baseRef: "main",
+        githubIdentity: "coding-agent",
+      };
+      expect(yield* createJudeSession(input, fetch)).toMatchObject({
+        id: "website-improve-search",
+        status: "provisioning",
+      });
+      expect(getJudeSessionsSnapshot()[0]).toMatchObject({
+        id: "website-improve-search",
+        prompt: "Improve search",
+        status: "provisioning",
+      });
+      expect(getCreatedJudeSessionIdsSnapshot()).toContain("website-improve-search");
+      dismissCreatedJudeSession("website-improve-search");
+      expect(getCreatedJudeSessionIdsSnapshot()).not.toContain("website-improve-search");
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main","githubIdentity":"coding-agent"}',
+      });
+    }),
+  );
+
+  it("waits for provisioning and refreshes the managed environments", async () => {
+    const provisioning = {
+      id: "website-improve-search",
+      name: "Improve search",
+      prompt: "Improve search",
+      project: "website",
+      status: "provisioning",
+      urls: { t3: "" },
+    };
+    const ready = {
+      ...provisioning,
+      status: "ready",
+      urls: { t3: "https://website-improve-search.t3.jude.prezly.dev" },
+    };
+    const fetch = vi
+      .fn<typeof globalThis.fetch>()
+      .mockResolvedValueOnce(Response.json(provisioning, { status: 201 }))
+      .mockResolvedValueOnce(Response.json({ sessions: [ready] }));
+    const refreshListener = vi.fn();
+    const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
+
+    await expect(
+      provisionJudeProject(
+        {
+          prompt: "Improve search",
+          project: "website",
+          model: "gpt-5.6-sol",
+          baseRef: "main",
+        },
+        { fetch, pollIntervalMs: 0 },
+      ),
+    ).resolves.toMatchObject({ status: "ready" });
+    expect(fetch).toHaveBeenCalledTimes(2);
+    expect(refreshListener).toHaveBeenCalledOnce();
+    unsubscribe();
+  });
 
   it.effect("surfaces Jude failures as retryable environment failures", () =>
     Effect.gen(function* () {

@@ -83,6 +83,7 @@ import {
   resolveProjectPathForDispatch,
 } from "../lib/projectPaths";
 import { onOpenCommandPalette } from "../commandPaletteBus";
+import { openCreateJudeProject } from "../judeProjectBus";
 import { isPreviewFocused } from "../lib/previewFocus";
 import { isTerminalFocused } from "../lib/terminalFocus";
 import { selectActiveRightPanel, useRightPanelStore } from "../rightPanelStore";
@@ -151,6 +152,7 @@ function projectFavicon(project: Project) {
     <ProjectFavicon
       environmentId={project.environmentId}
       cwd={project.workspaceRoot}
+      faviconPath={project.faviconPath}
       className={ITEM_ICON_CLASS}
     />
   );
@@ -1468,6 +1470,19 @@ function OpenCommandPaletteDialog(props: {
     });
   }
 
+  if (PRODUCT_CAPABILITIES.managedProjects) {
+    actionItems.push({
+      kind: "action",
+      value: "action:create-project",
+      searchTerms: ["create project", "new project", "jude", "environment", "repository"],
+      title: "Create project",
+      icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
+      run: async () => {
+        openCreateJudeProject();
+      },
+    });
+  }
+
   if (PRODUCT_CAPABILITIES.allowProjectManagement && wslAddProjectEnvironmentOption) {
     actionItems.push({
       kind: "action",
@@ -1507,6 +1522,17 @@ function OpenCommandPaletteDialog(props: {
     icon: <SettingsIcon className={ITEM_ICON_CLASS} />,
     run: async () => {
       await navigate({ to: "/settings" });
+    },
+  });
+
+  actionItems.push({
+    kind: "action",
+    value: "action:project-settings",
+    searchTerms: ["project", "settings", "scripts", "model", "grouping", "checkout"],
+    title: "Project settings",
+    icon: <FolderIcon className={ITEM_ICON_CLASS} />,
+    run: async () => {
+      await navigate({ to: "/settings/projects" });
     },
   });
 

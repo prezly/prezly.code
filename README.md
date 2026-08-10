@@ -36,6 +36,23 @@ Unsigned desktop installers for macOS, Windows, and Linux are published on the
 [Prezly.code Releases page](https://github.com/prezly/prezly.code/releases).
 Each version has its release notes and all platform installers in one place.
 
+### Installing on macOS
+
+The macOS app is not signed with an Apple Developer certificate, so Gatekeeper
+will ask you to approve it the first time you open it:
+
+1. Download the DMG for your Mac from the Releases page, open it, and drag
+   **Prezly.code** into **Applications**.
+2. In Finder, open **Applications**, Control-click **Prezly.code**, and choose
+   **Open**.
+3. Choose **Open** again in the warning. macOS remembers this approval for later
+   launches.
+
+If **Open** is not offered, try to launch the app once, then go to **System
+Settings → Privacy & Security**, scroll to **Security**, and click **Open
+Anyway** for Prezly.code. Only approve copies downloaded from the official
+Prezly.code Releases page linked above.
+
 ## Building locally
 
 Install the repository's Vite+ toolchain and dependencies, then build the P3
@@ -100,3 +117,49 @@ product decisions, and the build/release configuration needed by Prezlians.
 
 The upstream project is open source. Its original license and notices remain in
 this repository.
+
+## Documentation
+
+Full docs live in [docs/](./docs). There's no docs site yet.
+
+- [Install and first run](./docs/user/install.md)
+- [Permission modes](./docs/user/permission-modes.md)
+- [Keyboard shortcuts](./docs/user/keybindings.md)
+- [Customize a project icon](./docs/user/project-settings.md)
+- [Remote access from a phone or another machine](./docs/user/remote-access.md)
+- [Keeping app and server in sync](./docs/user/updating.md)
+- [Source control integrations](./docs/user/source-control.md)
+- Multiple accounts: [Codex](./docs/user/providers-codex.md) · [Claude](./docs/user/providers-claude.md)
+- Linux: [run T3 Code as a background service](./docs/user/background-service.md)
+
+Building from source? Start at [docs/internals/overview.md](./docs/internals/overview.md).
+
+## If you REALLY want to contribute still.... read this first
+
+### Install `vp`
+
+T3 Code uses Vite+ so you'll need to install the global `vp` command-line tool.
+
+#### macOS / Linux
+
+```bash
+curl -fsSL https://vite.plus | bash
+```
+
+#### Windows
+
+```bash
+irm https://vite.plus/ps1 | iex
+```
+
+Checkout their getting started guide for more information: https://viteplus.dev/guide/
+
+### Install dependencies
+
+```bash
+vp i
+```
+
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
+
+Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).

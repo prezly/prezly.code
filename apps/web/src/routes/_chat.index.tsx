@@ -4,6 +4,7 @@ import { LinkIcon, PlusIcon, RotateCcwIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 import { openCommandPalette } from "../commandPaletteBus";
+import { openCreateJudeProject } from "../judeProjectBus";
 import { sortScopedProjectsForSidebar } from "../components/Sidebar.logic";
 import { Button } from "../components/ui/button";
 import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/ui/empty";
@@ -133,7 +134,14 @@ function NoProjectsHero() {
                     Add project
                   </Button>
                 </div>
-              ) : null}
+              ) : (
+                <div className="mt-6 flex justify-center">
+                  <Button size="sm" onClick={openCreateJudeProject}>
+                    <PlusIcon className="size-4" />
+                    Create project
+                  </Button>
+                </div>
+              )}
             </EmptyHeader>
           </div>
         </Empty>

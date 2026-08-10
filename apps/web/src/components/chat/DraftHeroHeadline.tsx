@@ -4,6 +4,7 @@ import { FolderPlusIcon } from "lucide-react";
 import { useCallback, useMemo } from "react";
 
 import { openCommandPalette } from "~/commandPaletteBus";
+import { openCreateJudeProject } from "~/judeProjectBus";
 import { PRODUCT_CAPABILITIES } from "~/branding";
 import { useNewThreadHandler } from "~/hooks/useHandleNewThread";
 import { useClientSettings } from "~/hooks/useSettings";
@@ -42,6 +43,9 @@ export function DraftHeroHeadline({
   const projectSortOrder = useClientSettings((settings) => settings.sidebarProjectSortOrder);
   const handleNewThread = useNewThreadHandler();
   const openAddProject = useCallback(() => openCommandPalette({ open: "add-project" }), []);
+  const openCreateProject = PRODUCT_CAPABILITIES.managedProjects
+    ? openCreateJudeProject
+    : openAddProject;
 
   const environmentLabelById = useMemo(
     () =>
@@ -131,24 +135,24 @@ export function DraftHeroHeadline({
             );
           })}
         </MenuRadioGroup>
-        {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+        {PRODUCT_CAPABILITIES.allowProjectManagement || PRODUCT_CAPABILITIES.managedProjects ? (
           <>
             <MenuSeparator />
-            <MenuItem onClick={openAddProject}>
+            <MenuItem onClick={openCreateProject}>
               <FolderPlusIcon />
-              New project
+              Create project
             </MenuItem>
           </>
         ) : null}
       </MenuPopup>
     </Menu>
-  ) : PRODUCT_CAPABILITIES.allowProjectManagement ? (
+  ) : PRODUCT_CAPABILITIES.allowProjectManagement || PRODUCT_CAPABILITIES.managedProjects ? (
     <button
       type="button"
-      onClick={openAddProject}
+      onClick={openCreateProject}
       className="pointer-events-auto inline cursor-pointer border-muted-foreground/35 border-b border-dotted text-muted-foreground/60 transition-colors hover:border-muted-foreground/60 hover:text-muted-foreground/80 focus-visible:rounded-sm focus-visible:outline-hidden focus-visible:ring-2 focus-visible:ring-ring"
     >
-      {activeProjectTitle ?? "Add a project"}
+      {activeProjectTitle ?? "Create a project"}
     </button>
   ) : null;
 
