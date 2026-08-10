@@ -53,6 +53,17 @@ Settings → Privacy & Security**, scroll to **Security**, and click **Open
 Anyway** for Prezly.code. Only approve copies downloaded from the official
 Prezly.code Releases page linked above.
 
+For a quicker Terminal-based option, remove the quarantine attribute after
+copying the app to **Applications**:
+
+```bash
+xattr -dr com.apple.quarantine "/Applications/Prezly.code.app"
+```
+
+You can then open Prezly.code normally. This command recursively removes
+Gatekeeper's quarantine flag, so only run it for an app downloaded from the
+official Releases page.
+
 ## Building locally
 
 Install the repository's Vite+ toolchain and dependencies, then build the P3
