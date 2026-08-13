@@ -5,10 +5,8 @@ import * as Effect from "effect/Effect";
 import {
   judeSessionDisplayName,
   listJudeGitHubIdentities,
-  listJudeModels,
   provisionJudeProject,
   type JudeGitHubIdentity,
-  type JudeModel,
 } from "~/connection/jude";
 import { onCreateJudeProject } from "~/judeProjectBus";
 import { Button } from "~/components/ui/button";
@@ -66,11 +64,9 @@ export function JudeCreateProjectDialog() {
   const [project, setProject] = useState<JudeProject>("app");
   const [name, setName] = useState("");
   const [baseRef, setBaseRef] = useState(DEFAULT_BASE_REFS.app);
-  const [model, setModel] = useState(DEFAULT_MODEL);
   const [githubIdentity, setGitHubIdentity] = useState("");
   const [customLicenses, setCustomLicenses] = useState("");
   const [identities, setIdentities] = useState<ReadonlyArray<JudeGitHubIdentity>>([]);
-  const [models, setModels] = useState<ReadonlyArray<JudeModel>>([]);
   const [status, setStatus] = useState<"idle" | "creating">("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = status !== "idle";
@@ -86,21 +82,14 @@ export function JudeCreateProjectDialog() {
   );
 
   useEffect(() => {
-    if (!open || identities.length > 0 || models.length > 0) return;
+    if (!open || identities.length > 0) return;
     void Promise.allSettled([
       Effect.runPromise(listJudeGitHubIdentities()).then((next) => {
         setIdentities(next);
         setGitHubIdentity(next.find((identity) => identity.default)?.name ?? next[0]?.name ?? "");
       }),
-      Effect.runPromise(listJudeModels()).then((next) => {
-        setModels(next);
-        if (next.some((candidate) => candidate.id === DEFAULT_MODEL)) setModel(DEFAULT_MODEL);
-        else if (next[0]) setModel(next[0].id);
-      }),
     ]);
-  }, [identities.length, models.length, open]);
-
-  const selectedModelName = models.find((candidate) => candidate.id === model)?.name ?? model;
+  }, [identities.length, open]);
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -113,7 +102,7 @@ export function JudeCreateProjectDialog() {
         {
           prompt: name.trim(),
           project,
-          model,
+          model: DEFAULT_MODEL,
           baseRef: baseRef.trim(),
           ...(githubIdentity ? { githubIdentity } : {}),
           ...(project === "app" && customLicenses.trim()
@@ -229,53 +218,30 @@ export function JudeCreateProjectDialog() {
                 />
               </div>
             </div>
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label>GitHub identity</Label>
-                <Select
-                  value={githubIdentity}
-                  onValueChange={(value) => {
-                    if (value !== null) setGitHubIdentity(value);
-                  }}
-                  disabled={busy || identities.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue>
-                      {identities.find((item) => item.name === githubIdentity)
-                        ? identityLabel(identities.find((item) => item.name === githubIdentity)!)
-                        : "Configured token"}
-                    </SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {identities.map((identity) => (
-                      <SelectItem key={identity.name} value={identity.name}>
-                        {identityLabel(identity)}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-              </div>
-              <div className="grid gap-2">
-                <Label>Model</Label>
-                <Select
-                  value={model}
-                  onValueChange={(value) => {
-                    if (value !== null) setModel(value);
-                  }}
-                  disabled={busy || models.length === 0}
-                >
-                  <SelectTrigger>
-                    <SelectValue>{selectedModelName}</SelectValue>
-                  </SelectTrigger>
-                  <SelectPopup>
-                    {models.map((item) => (
-                      <SelectItem key={item.id} value={item.id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectPopup>
-                </Select>
-              </div>
+            <div className="grid gap-2">
+              <Label>GitHub identity</Label>
+              <Select
+                value={githubIdentity}
+                onValueChange={(value) => {
+                  if (value !== null) setGitHubIdentity(value);
+                }}
+                disabled={busy || identities.length === 0}
+              >
+                <SelectTrigger>
+                  <SelectValue>
+                    {identities.find((item) => item.name === githubIdentity)
+                      ? identityLabel(identities.find((item) => item.name === githubIdentity)!)
+                      : "Configured token"}
+                  </SelectValue>
+                </SelectTrigger>
+                <SelectPopup>
+                  {identities.map((identity) => (
+                    <SelectItem key={identity.name} value={identity.name}>
+                      {identityLabel(identity)}
+                    </SelectItem>
+                  ))}
+                </SelectPopup>
+              </Select>
             </div>
             {project === "app" ? (
               <div className="grid gap-2">
