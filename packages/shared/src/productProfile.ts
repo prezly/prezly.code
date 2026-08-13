@@ -4,7 +4,9 @@ export interface ProductCapabilities {
   readonly allowDesktopUpdates: boolean;
   readonly allowLocalEnvironment: boolean;
   readonly allowManualConnections: boolean;
+  readonly allowPullRequestReviews: boolean;
   readonly allowProjectManagement: boolean;
+  readonly allowT3Connect: boolean;
   readonly allowUsageInsights: boolean;
   readonly allowWorktreeManagement: boolean;
   readonly fixedWorkspaceRoot: string | null;
@@ -34,7 +36,9 @@ const T3_PRODUCT_PROFILE: ProductProfile = {
     allowDesktopUpdates: true,
     allowLocalEnvironment: true,
     allowManualConnections: true,
+    allowPullRequestReviews: true,
     allowProjectManagement: true,
+    allowT3Connect: true,
     allowUsageInsights: true,
     allowWorktreeManagement: true,
     fixedWorkspaceRoot: null,
@@ -58,7 +62,9 @@ const P3_PRODUCT_PROFILE: ProductProfile = {
     allowDesktopUpdates: false,
     allowLocalEnvironment: false,
     allowManualConnections: false,
+    allowPullRequestReviews: false,
     allowProjectManagement: false,
+    allowT3Connect: false,
     allowUsageInsights: false,
     allowWorktreeManagement: false,
     fixedWorkspaceRoot: "/source",

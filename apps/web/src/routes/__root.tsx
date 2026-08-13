@@ -10,11 +10,18 @@ import {
 } from "@tanstack/react-router";
 import { useEffect, useEffectEvent, useRef, useState } from "react";
 
-import { APP_BASE_NAME, APP_DISPLAY_NAME, APP_STAGE_LABEL, PRODUCT_PROFILE } from "../branding";
+import {
+  APP_BASE_NAME,
+  APP_DISPLAY_NAME,
+  APP_STAGE_LABEL,
+  PRODUCT_CAPABILITIES,
+  PRODUCT_PROFILE,
+} from "../branding";
 import { resolveServerBackedAppDisplayName } from "../branding.logic";
 import { AppSidebarLayout } from "../components/AppSidebarLayout";
 import { CommandPalette } from "../components/CommandPalette";
 import { JudeCreateProjectDialog } from "../components/JudeCreateProjectDialog";
+import { ConfirmDialogHost } from "../components/ConfirmDialogHost";
 import { ConnectOnboardingDialog } from "../components/cloud/ConnectOnboardingDialog";
 import { RelayClientInstallDialog } from "../components/cloud/RelayClientInstallDialog";
 import { SshPasswordPromptDialog } from "../components/desktop/SshPasswordPromptDialog";
@@ -141,9 +148,11 @@ function RootRouteView() {
         <GlassAppearanceSync />
         <FontAppearanceSync />
         {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
-        <RelayClientInstallDialog />
-        <ConnectOnboardingDialog />
+        {PRODUCT_CAPABILITIES.allowT3Connect ? <RelayClientInstallDialog /> : null}
+        {PRODUCT_CAPABILITIES.allowT3Connect ? <ConnectOnboardingDialog /> : null}
         <SshPasswordPromptDialog />
+        {PRODUCT_PROFILE.id === "p3" ? <JudeCreateProjectDialog /> : null}
+        <ConfirmDialogHost />
         {PRODUCT_PROFILE.id === "p3" ? <JudeCreateProjectDialog /> : null}
         <SlowRpcRequestToastCoordinator />
         <HostedStaticEnvironmentBootstrap />

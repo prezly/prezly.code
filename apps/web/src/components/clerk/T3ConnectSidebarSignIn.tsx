@@ -1,19 +1,21 @@
 import { UserButton, useAuth } from "@clerk/react";
-import { LogInIcon, SmartphoneIcon } from "lucide-react";
+import { LogInIcon, ServerIcon, SmartphoneIcon } from "lucide-react";
 
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
+import { T3ConnectUserProfilePage } from "./T3ConnectUserProfilePage";
 import { useT3ConnectAuthPrompt } from "./useT3ConnectAuthPrompt";
+import { PRODUCT_CAPABILITIES } from "../../branding";
 
 export function T3ConnectSidebarSignIn() {
-  if (!hasCloudPublicConfig()) return null;
+  if (!PRODUCT_CAPABILITIES.allowT3Connect || !hasCloudPublicConfig()) return null;
 
   return <ConfiguredT3ConnectSidebarSignIn />;
 }
 
 export function T3ConnectSidebarAvatar() {
-  if (!hasCloudPublicConfig()) return null;
+  if (!PRODUCT_CAPABILITIES.allowT3Connect || !hasCloudPublicConfig()) return null;
 
   return <ConfiguredT3ConnectSidebarAvatar />;
 }
@@ -38,6 +40,13 @@ function ConfiguredT3ConnectSidebarAvatar() {
         url="mobile-clients"
       >
         <MobileClientsUserProfilePage />
+      </UserButton.UserProfilePage>
+      <UserButton.UserProfilePage
+        label="T3 Connect"
+        labelIcon={<ServerIcon className="size-4" />}
+        url="t3-connect"
+      >
+        <T3ConnectUserProfilePage />
       </UserButton.UserProfilePage>
     </UserButton>
   );

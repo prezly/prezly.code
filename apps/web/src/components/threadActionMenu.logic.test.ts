@@ -38,7 +38,7 @@ describe("buildThreadActionMenuItems", () => {
           judeLink: false,
         },
       }),
-    ).toEqual(["rename", "mark-unread", "copy-path", "delete"]);
+    ).toEqual(["rename", "mark-unread", "copy-path", "copy-thread-id", "delete"]);
   });
 
   it("includes branch items only for threads with a branch", () => {
