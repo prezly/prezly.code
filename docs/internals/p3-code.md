@@ -21,6 +21,10 @@ thread, and orchestration internals while replacing local environment management
   also links to the environment's Jude session details.
 - P3 currently relies on network access through Warp. There is no Jude user authentication or
   user-scoped discovery yet.
+- P3 keeps the shared pull-request review and T3 Connect implementations in the build, but its
+  product capabilities hide their routes and entry points. Jude remains the only managed
+  connection path. This lets upstream features stay mergeable without exposing unsupported
+  product surfaces in Prezly.code.
 
 ## Connection flow
 
