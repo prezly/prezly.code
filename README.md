@@ -19,8 +19,8 @@ surface for the conversations running there.
   successful sync.
 - Discovery runs every three seconds. You can also refresh from the sidebar,
   Connections settings, or a thread's context menu.
-- Jude currently relies on Warp network access and does not require separate
-  authentication. User-scoped Jude environments can be added later.
+- Jude requires both Warp network access and a Prezly GitHub login. Prezly.code
+  opens the login when its saved Jude session is missing or expired.
 
 If Jude is temporarily unreachable, Prezly.code keeps valid cached connections
 and retries. A failed request is never treated as an authoritative deletion.
@@ -29,8 +29,9 @@ and retries. A failed request is never treated as an authoritative deletion.
 
 1. Connect to the Prezly network through Warp.
 2. Open Prezly.code.
-3. Pick a Jude environment from the project switcher.
-4. Continue an existing prompt or start another thread in that environment.
+3. Complete the GitHub sign-in if Prezly.code asks for it.
+4. Pick a Jude environment from the project switcher.
+5. Continue an existing prompt or start another thread in that environment.
 
 Unsigned desktop installers for macOS, Windows, and Linux are published on the
 [Prezly.code Releases page](https://github.com/prezly/prezly.code/releases).

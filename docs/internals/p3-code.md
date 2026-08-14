@@ -19,8 +19,8 @@ thread, and orchestration internals while replacing local environment management
   breadcrumbs. The project picker prefixes that name with the Jude app. When Jude exposes a
   `visitUrl`, P3 offers it as an attached **Preview** browser surface in the right panel; the panel
   also links to the environment's Jude session details.
-- P3 currently relies on network access through Warp. There is no Jude user authentication or
-  user-scoped discovery yet.
+- P3 relies on network access through Warp and authenticates to Jude with Jude's GitHub OAuth
+  session. Discovery follows Jude's authenticated, user-visible session list.
 - P3 keeps the shared pull-request review and T3 Connect implementations in the build, but its
   product capabilities hide their routes and entry points. Jude remains the only managed
   connection path. This lets upstream features stay mergeable without exposing unsupported
@@ -29,9 +29,12 @@ thread, and orchestration internals while replacing local environment management
 ## Connection flow
 
 The Electron main process proxies the Jude control-plane API at `/_p3/jude` so the renderer does
-not depend on Jude CORS configuration. The renderer polls `GET /api/sessions`, requests a fresh T3
-pairing credential for ready sessions, and registers those T3 servers as platform-managed
-environments. Pairing authenticates the transport to each T3 server; it is not Jude user auth.
+not depend on Jude CORS configuration. The proxy uses Electron's Jude cookie session and rewrites
+the request origin for Jude's same-origin mutation guard. When Jude returns 401, the renderer asks
+the main process to open Jude's GitHub OAuth flow in a desktop-owned window, then retries the
+request. The renderer polls `GET /api/sessions`, requests a fresh T3 pairing credential for ready
+sessions, and registers those T3 servers as platform-managed environments. Pairing authenticates
+the transport to each T3 server; it is separate from Jude user authentication.
 
 Jude's T3 containers already start in `/source` with
 `--auto-bootstrap-project-from-cwd`. That deployment invariant creates the single project while
@@ -60,9 +63,3 @@ secrets, and cached environment data live below `~/.p3` (or an explicit `P3CODE_
 preferences, cookies, IndexedDB, and browser caches use the `p3code` application-data directory and
 the `p3code://` origin. An ambient `T3CODE_HOME` never redirects the P3 profile into T3 Code's state
 directory.
-
-## Future auth boundary
-
-User authentication and user-scoped environment discovery belong at the Electron Jude proxy.
-That boundary can add Jude credentials without changing the environment reconciliation or the
-T3 connection registry.

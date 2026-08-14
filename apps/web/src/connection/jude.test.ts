@@ -7,6 +7,7 @@ import { expect, vi } from "vite-plus/test";
 import {
   createJudeSession,
   dismissCreatedJudeSession,
+  ensureJudeAuthenticated,
   formatJudeAppName,
   getCreatedJudeSessionIdsSnapshot,
   getJudeSessionsSnapshot,
@@ -115,6 +116,39 @@ describe("Jude discovery", () => {
       yield* listJudeSessions(fetch);
 
       expect(fetch).toHaveBeenCalledOnce();
+    }),
+  );
+
+  it.effect("signs in to Jude and retries an unauthorized request", () =>
+    Effect.gen(function* () {
+      const authenticateJude = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("window", { desktopBridge: { authenticateJude } });
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(Response.json({ error: "not authenticated" }, { status: 401 }))
+        .mockResolvedValueOnce(Response.json({ sessions: [] }));
+
+      try {
+        expect(yield* listJudeSessions(fetch)).toEqual([]);
+        expect(authenticateJude).toHaveBeenCalledOnce();
+        expect(fetch).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }),
+  );
+
+  it.effect("checks Jude authentication during P3 bootstrap", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ id: 42 }));
+      const refreshListener = vi.fn();
+      const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
+
+      yield* ensureJudeAuthenticated(fetch);
+
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/auth/me", { method: "GET" });
+      expect(refreshListener).toHaveBeenCalledOnce();
+      unsubscribe();
     }),
   );
 

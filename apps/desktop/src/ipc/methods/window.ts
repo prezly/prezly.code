@@ -15,6 +15,7 @@ import * as Path from "effect/Path";
 import * as Effect from "effect/Effect";
 import * as Option from "effect/Option";
 import * as Schema from "effect/Schema";
+import * as Electron from "electron";
 
 import * as DesktopBackendPool from "../../backend/DesktopBackendPool.ts";
 import * as DesktopLocalEnvironmentAuth from "../../backend/DesktopLocalEnvironmentAuth.ts";
@@ -45,6 +46,74 @@ const ContextMenuInput = Schema.Struct({
   position: Schema.optionalKey(ContextMenuPosition),
 });
 
+let judeAuthenticationPromise: Promise<void> | null = null;
+
+class JudeAuthenticationError extends Schema.TaggedErrorClass<JudeAuthenticationError>()(
+  "JudeAuthenticationError",
+  { cause: Schema.Defect() },
+) {
+  override get message(): string {
+    return "Could not authenticate with Jude.";
+  }
+}
+
+function authenticateJudeInWindow(input: {
+  readonly judeOrigin: URL;
+  readonly owner: Electron.BrowserWindow | null;
+}): Promise<void> {
+  if (judeAuthenticationPromise !== null) return judeAuthenticationPromise;
+
+  const promise = new Promise<void>((resolve, reject) => {
+    const authWindow = new Electron.BrowserWindow({
+      width: 560,
+      height: 720,
+      minWidth: 420,
+      minHeight: 560,
+      show: false,
+      title: "Sign in to Jude",
+      ...(input.owner === null ? {} : { parent: input.owner, modal: true }),
+      webPreferences: {
+        contextIsolation: true,
+        nodeIntegration: false,
+        sandbox: true,
+      },
+    });
+    let authenticated = false;
+
+    const finish = (error?: Error) => {
+      if (!authWindow.isDestroyed()) authWindow.close();
+      if (error) reject(error);
+      else resolve();
+    };
+    const checkNavigation = (_event: Electron.Event, rawUrl: string) => {
+      try {
+        const url = new URL(rawUrl);
+        if (url.origin === input.judeOrigin.origin && url.pathname === "/") {
+          authenticated = true;
+          finish();
+        }
+      } catch {
+        // Ignore transient non-URL navigation events from the OAuth window.
+      }
+    };
+
+    authWindow.once("ready-to-show", () => authWindow.show());
+    authWindow.webContents.on("did-navigate", checkNavigation);
+    authWindow.on("closed", () => {
+      if (!authenticated) reject(new Error("Jude sign-in was cancelled."));
+    });
+    void authWindow
+      .loadURL(new URL("/api/auth/github", input.judeOrigin).toString())
+      .catch((cause) => {
+        finish(cause instanceof Error ? cause : new Error(String(cause)));
+      });
+  }).finally(() => {
+    judeAuthenticationPromise = null;
+  });
+  judeAuthenticationPromise = promise;
+  return promise;
+}
+
 function toWebSocketBaseUrl(httpBaseUrl: URL): string {
   const url = new URL(httpBaseUrl.href);
   url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -57,6 +126,27 @@ export const getAppBranding = DesktopIpc.makeSyncIpcMethod({
   handler: Effect.fn("desktop.ipc.window.getAppBranding")(function* () {
     const environment = yield* DesktopEnvironment.DesktopEnvironment;
     return environment.branding;
+  }),
+});
+
+export const authenticateJude = DesktopIpc.makeIpcMethod({
+  channel: IpcChannels.AUTHENTICATE_JUDE_CHANNEL,
+  payload: Schema.Void,
+  result: Schema.Void,
+  handler: Effect.fn("desktop.ipc.window.authenticateJude")(function* () {
+    const environment = yield* DesktopEnvironment.DesktopEnvironment;
+    const judeBaseUrl = environment.productProfile.judeBaseUrl;
+    if (judeBaseUrl === null) {
+      return yield* new JudeAuthenticationError({
+        cause: "Jude authentication is unavailable in this product.",
+      });
+    }
+    const electronWindow = yield* ElectronWindow.ElectronWindow;
+    const owner = Option.getOrNull(yield* electronWindow.currentMainOrFirst);
+    yield* Effect.tryPromise({
+      try: () => authenticateJudeInWindow({ judeOrigin: new URL(judeBaseUrl), owner }),
+      catch: (cause) => new JudeAuthenticationError({ cause }),
+    });
   }),
 });
 

@@ -199,12 +199,13 @@ async function proxyJudeRequest(
   const targetPath = requestUrl.pathname.slice(JUDE_PROXY_PATH_PREFIX.length) || "/";
   const targetUrl = new URL(`${targetPath}${requestUrl.search}`, judeOrigin);
   const headers = new Headers(request.headers);
-  headers.delete("origin");
-  headers.delete("referer");
   headers.delete("host");
+  headers.set("origin", judeOrigin.origin);
+  headers.set("referer", new URL("/", judeOrigin).toString());
   const init: RequestInit = {
     method: request.method,
     headers,
+    credentials: "include",
     redirect: "manual",
   };
   if (request.method !== "GET" && request.method !== "HEAD") {

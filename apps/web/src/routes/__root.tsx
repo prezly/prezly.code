@@ -50,6 +50,7 @@ import { resolveInitialServerAuthGateState } from "../environments/primary";
 import { hasHostedPairingRequest, isHostedStaticApp } from "../hostedPairing";
 import { shellEnvironment } from "../state/shell";
 import { useAtomValue } from "@effect/atom-react";
+import * as Effect from "effect/Effect";
 import { useAtomCommand } from "../state/use-atom-command";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import {
@@ -62,6 +63,7 @@ import {
   createKeybindingsUpdateToastController,
   type KeybindingsUpdateToastController,
 } from "../components/KeybindingsUpdateToast.logic";
+import { ensureJudeAuthenticated } from "../connection/jude";
 
 export const Route = createRootRoute({
   beforeLoad: async ({ location }) => {
@@ -153,9 +155,9 @@ function RootRouteView() {
         <SshPasswordPromptDialog />
         {PRODUCT_PROFILE.id === "p3" ? <JudeCreateProjectDialog /> : null}
         <ConfirmDialogHost />
-        {PRODUCT_PROFILE.id === "p3" ? <JudeCreateProjectDialog /> : null}
         <SlowRpcRequestToastCoordinator />
         <HostedStaticEnvironmentBootstrap />
+        {PRODUCT_PROFILE.id === "p3" ? <JudeAuthenticationBootstrap /> : null}
         {primaryEnvironmentAuthenticated ? <EventRouter /> : null}
         {primaryEnvironmentAuthenticated ? <ProviderUpdateLaunchNotification /> : null}
         {appShell}
@@ -165,6 +167,18 @@ function RootRouteView() {
       </AnchoredToastProvider>
     </ToastProvider>
   );
+}
+
+function JudeAuthenticationBootstrap() {
+  useEffect(() => {
+    const controller = new AbortController();
+    void Effect.runPromise(ensureJudeAuthenticated(globalThis.fetch, controller.signal)).catch(
+      () => undefined,
+    );
+    return () => controller.abort();
+  }, []);
+
+  return null;
 }
 
 function GlassAppearanceSync() {

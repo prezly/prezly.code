@@ -61,6 +61,8 @@ const decodeJudeGitHubIdentitiesResponse = Schema.decodeUnknownEffect(
 const decodeJudeModelsResponse = Schema.decodeUnknownEffect(JudeModelsResponseSchema);
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
+let judeAuthenticationPromise: Promise<void> | null = null;
+
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
 export type JudeGitHubIdentity = typeof JudeGitHubIdentitySchema.Type;
@@ -207,20 +209,34 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
   readonly body?: unknown;
   readonly signal?: AbortSignal;
 }) {
-  const response = yield* Effect.tryPromise({
-    try: () =>
-      input.fetch.call(globalThis, `${JUDE_DESKTOP_PROXY_PATH}${input.path}`, {
-        method: input.method,
-        ...(input.body === undefined
-          ? {}
-          : {
-              headers: { "Content-Type": "application/json" },
-              body: encodeUnknownJson(input.body),
-            }),
-        ...(input.signal ? { signal: input.signal } : {}),
-      }),
+  const fetchRequest = () =>
+    input.fetch.call(globalThis, `${JUDE_DESKTOP_PROXY_PATH}${input.path}`, {
+      method: input.method,
+      ...(input.body === undefined
+        ? {}
+        : {
+            headers: { "Content-Type": "application/json" },
+            body: encodeUnknownJson(input.body),
+          }),
+      ...(input.signal ? { signal: input.signal } : {}),
+    });
+  let response = yield* Effect.tryPromise({
+    try: fetchRequest,
     catch: (cause) => discoveryError(input.operation, cause),
   });
+  if (response.status === 401 && window.desktopBridge?.authenticateJude) {
+    judeAuthenticationPromise ??= window.desktopBridge.authenticateJude().finally(() => {
+      judeAuthenticationPromise = null;
+    });
+    yield* Effect.tryPromise({
+      try: () => judeAuthenticationPromise!,
+      catch: (cause) => discoveryError(`${input.operation} authentication`, cause),
+    });
+    response = yield* Effect.tryPromise({
+      try: fetchRequest,
+      catch: (cause) => discoveryError(input.operation, cause),
+    });
+  }
   if (!response.ok) {
     return yield* discoveryError(input.operation, `HTTP ${response.status}`);
   }
@@ -228,6 +244,20 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
     try: () => response.json(),
     catch: (cause) => discoveryError(input.operation, cause),
   });
+});
+
+export const ensureJudeAuthenticated = Effect.fn("web.jude.ensureAuthenticated")(function* (
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+  signal?: AbortSignal,
+) {
+  yield* requestJson({
+    fetch,
+    operation: "authentication check",
+    path: "/api/auth/me",
+    method: "GET",
+    ...(signal ? { signal } : {}),
+  });
+  requestJudeEnvironmentRefresh();
 });
 
 export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (

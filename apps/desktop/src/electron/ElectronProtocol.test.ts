@@ -173,6 +173,10 @@ describe("ElectronProtocol", () => {
       const requestInit = netFetchMock.mock.calls[0]?.[1] as RequestInit | undefined;
       assert.isDefined(requestInit);
       assert.equal(requestInit.method, "GET");
+      assert.equal(requestInit.credentials, "include");
+      const headers = new Headers(requestInit.headers);
+      assert.equal(headers.get("origin"), "https://jude.prezly.net");
+      assert.equal(headers.get("referer"), "https://jude.prezly.net/");
     }).pipe(Effect.provide(ElectronProtocol.layer)),
   );
 
