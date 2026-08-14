@@ -118,6 +118,25 @@ describe("Jude discovery", () => {
     }),
   );
 
+  it.effect("signs in to Jude and retries an unauthorized request", () =>
+    Effect.gen(function* () {
+      const authenticateJude = vi.fn().mockResolvedValue(undefined);
+      vi.stubGlobal("window", { desktopBridge: { authenticateJude } });
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(Response.json({ error: "not authenticated" }, { status: 401 }))
+        .mockResolvedValueOnce(Response.json({ sessions: [] }));
+
+      try {
+        expect(yield* listJudeSessions(fetch)).toEqual([]);
+        expect(authenticateJude).toHaveBeenCalledOnce();
+        expect(fetch).toHaveBeenCalledTimes(2);
+      } finally {
+        vi.unstubAllGlobals();
+      }
+    }),
+  );
+
   it.effect("requests a fresh pairing URL for an environment", () =>
     Effect.gen(function* () {
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(

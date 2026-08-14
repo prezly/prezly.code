@@ -1047,6 +1047,8 @@ export interface DesktopBridge {
     items: readonly ContextMenuItem<T>[],
     position?: { x: number; y: number },
   ) => Promise<T | null>;
+  /** Opens the Jude GitHub login flow in a desktop-owned window. */
+  authenticateJude?: () => Promise<void>;
   openExternal: (url: string) => Promise<boolean>;
   onMenuAction: (listener: (action: string) => void) => () => void;
   getWindowFullscreenState: () => boolean;
