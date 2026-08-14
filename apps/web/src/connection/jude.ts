@@ -246,6 +246,20 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
   });
 });
 
+export const ensureJudeAuthenticated = Effect.fn("web.jude.ensureAuthenticated")(function* (
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+  signal?: AbortSignal,
+) {
+  yield* requestJson({
+    fetch,
+    operation: "authentication check",
+    path: "/api/auth/me",
+    method: "GET",
+    ...(signal ? { signal } : {}),
+  });
+  requestJudeEnvironmentRefresh();
+});
+
 export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
   fetch: typeof globalThis.fetch = globalThis.fetch,
 ) {

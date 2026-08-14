@@ -7,6 +7,7 @@ import { expect, vi } from "vite-plus/test";
 import {
   createJudeSession,
   dismissCreatedJudeSession,
+  ensureJudeAuthenticated,
   formatJudeAppName,
   getCreatedJudeSessionIdsSnapshot,
   getJudeSessionsSnapshot,
@@ -134,6 +135,20 @@ describe("Jude discovery", () => {
       } finally {
         vi.unstubAllGlobals();
       }
+    }),
+  );
+
+  it.effect("checks Jude authentication during P3 bootstrap", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ id: 42 }));
+      const refreshListener = vi.fn();
+      const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
+
+      yield* ensureJudeAuthenticated(fetch);
+
+      expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/auth/me", { method: "GET" });
+      expect(refreshListener).toHaveBeenCalledOnce();
+      unsubscribe();
     }),
   );
 
