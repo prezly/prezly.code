@@ -413,6 +413,7 @@ export const checkOpenCodeProviderStatus = Effect.fn("checkOpenCodeProviderStatu
       : openCodeRuntime.loadInventoryFromCli({
           binaryPath: openCodeSettings.binaryPath,
           environment: resolvedEnvironment,
+          cwd,
         })
     ).pipe(
       Effect.mapError(

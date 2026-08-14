@@ -35,6 +35,7 @@ const runtimeMock = {
     versionStdout: DEFAULT_VERSION_STDOUT,
     inventoryError: null as Error | null,
     closeCalls: 0,
+    inventoryCwd: null as string | null,
     inventory: {
       providerList: { connected: [] as string[], all: [] as unknown[], default: {} },
       agents: [] as unknown[],
@@ -45,6 +46,7 @@ const runtimeMock = {
     this.state.versionStdout = DEFAULT_VERSION_STDOUT;
     this.state.inventoryError = null;
     this.state.closeCalls = 0;
+    this.state.inventoryCwd = null;
     this.state.inventory = {
       providerList: { connected: [], all: [] as unknown[], default: {} },
       agents: [] as unknown[],
@@ -95,8 +97,9 @@ const OpenCodeRuntimeTestDouble: OpenCodeRuntimeShape = {
           }),
         )
       : Effect.succeed(runtimeMock.state.inventory as OpenCodeInventory),
-  loadInventoryFromCli: () =>
-    runtimeMock.state.inventoryError
+  loadInventoryFromCli: ({ cwd }) => {
+    runtimeMock.state.inventoryCwd = cwd;
+    return runtimeMock.state.inventoryError
       ? Effect.fail(
           new OpenCodeRuntimeError({
             operation: "loadInventoryFromCli",
@@ -104,7 +107,8 @@ const OpenCodeRuntimeTestDouble: OpenCodeRuntimeShape = {
             cause: runtimeMock.state.inventoryError,
           }),
         )
-      : Effect.succeed(runtimeMock.state.inventory as OpenCodeInventory),
+      : Effect.succeed(runtimeMock.state.inventory as OpenCodeInventory);
+  },
 };
 
 beforeEach(() => {
@@ -212,6 +216,15 @@ it.layer(testLayer)("checkOpenCodeProviderStatus", (it) => {
       yield* checkOpenCodeProviderStatus(makeOpenCodeSettings(), process.cwd());
 
       NodeAssert.equal(runtimeMock.state.closeCalls, 0);
+    }),
+  );
+
+  it.effect("loads project-aware models from the configured server cwd", () =>
+    Effect.gen(function* () {
+      const cwd = "/workspace/with-opencode-config";
+      yield* checkOpenCodeProviderStatus(makeOpenCodeSettings(), cwd);
+
+      NodeAssert.equal(runtimeMock.state.inventoryCwd, cwd);
     }),
   );
 
