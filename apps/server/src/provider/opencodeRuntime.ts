@@ -139,6 +139,7 @@ export interface OpenCodeRuntimeShape {
     readonly binaryPath: string;
     readonly args: ReadonlyArray<string>;
     readonly environment?: NodeJS.ProcessEnv;
+    readonly cwd?: string;
   }) => Effect.Effect<OpenCodeCommandResult, OpenCodeRuntimeError>;
   readonly createOpenCodeSdkClient: (input: {
     readonly baseUrl: string;
@@ -151,6 +152,7 @@ export interface OpenCodeRuntimeShape {
   readonly loadInventoryFromCli: (input: {
     readonly binaryPath: string;
     readonly environment?: NodeJS.ProcessEnv;
+    readonly cwd: string;
   }) => Effect.Effect<OpenCodeInventory, OpenCodeRuntimeError>;
 }
 
@@ -406,6 +408,7 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
       const child = yield* spawner.spawn(
         ChildProcess.make(spawnCommand.command, spawnCommand.args, {
           shell: spawnCommand.shell,
+          ...(input.cwd ? { cwd: input.cwd } : {}),
           ...(input.environment ? { env: input.environment } : { extendEnv: true }),
         }),
       );
@@ -663,17 +666,22 @@ const makeOpenCodeRuntime = Effect.gen(function* () {
   const loadInventoryFromCli: OpenCodeRuntimeShape["loadInventoryFromCli"] = (input) =>
     Effect.gen(function* () {
       const env = input.environment !== undefined ? { environment: input.environment } : ({} as {});
+      const cwd = { cwd: input.cwd };
 
       const runModelsCli = () =>
         runOpenCodeCommand({
           binaryPath: input.binaryPath,
           args: ["models", "--verbose"],
           ...env,
+          ...cwd,
         }).pipe(Effect.exit);
       const runAgentsCli = () =>
-        runOpenCodeCommand({ binaryPath: input.binaryPath, args: ["agent", "list"], ...env }).pipe(
-          Effect.exit,
-        );
+        runOpenCodeCommand({
+          binaryPath: input.binaryPath,
+          args: ["agent", "list"],
+          ...env,
+          ...cwd,
+        }).pipe(Effect.exit);
 
       // First attempt — run both in parallel
       let [modelsResult, agentsResult] = yield* Effect.all([runModelsCli(), runAgentsCli()], {
