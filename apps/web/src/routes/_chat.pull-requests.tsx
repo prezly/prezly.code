@@ -1557,6 +1557,7 @@ function PullRequestsRouteView() {
             attachedPreviewUrl={null}
             onOpenJudeDetails={() => undefined}
             judeDetailUrl={null}
+            judeEnvironmentReady={false}
             onAddTerminal={() => undefined}
             onAddDiff={() => undefined}
             onAddFiles={() => undefined}

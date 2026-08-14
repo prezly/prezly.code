@@ -1800,6 +1800,7 @@ function ChatViewContent(props: ChatViewProps) {
     ? judeSessionForConnection(activeEnvironmentConnectionId, judeSessions)
     : null;
   const activeJudeVisitUrl = activeJudeSession?.visitUrl?.trim() || null;
+  const activeJudeEnvironmentReady = activeJudeSession?.status === "ready";
   const activeJudeDetailUrl = PRODUCT_PROFILE.judeBaseUrl
     ? judeSessionDetailUrlForConnection(PRODUCT_PROFILE.judeBaseUrl, activeEnvironmentConnectionId)
     : null;
@@ -3286,15 +3287,15 @@ function ChatViewContent(props: ChatViewProps) {
     void addBrowserSurface({ threadRef: activeThreadRef, openPreview });
   }, [activeThreadRef, openPreview]);
   const createAttachedPreviewSurface = useCallback(() => {
-    if (!activeThreadRef || !activeJudeVisitUrl) return;
+    if (!activeThreadRef || !activeJudeVisitUrl || !activeJudeEnvironmentReady) return;
     void addBrowserSurface({
       threadRef: activeThreadRef,
       openPreview,
       url: activeJudeVisitUrl,
     });
-  }, [activeJudeVisitUrl, activeThreadRef, openPreview]);
+  }, [activeJudeEnvironmentReady, activeJudeVisitUrl, activeThreadRef, openPreview]);
   const openActiveJudeDetails = useCallback(() => {
-    if (!activeThreadRef || !activeJudeDetailUrl) return;
+    if (!activeThreadRef || !activeJudeDetailUrl || !activeJudeEnvironmentReady) return;
     void addBrowserSurface({
       threadRef: activeThreadRef,
       openPreview,
@@ -3309,7 +3310,7 @@ function ChatViewContent(props: ChatViewProps) {
         });
       }
     });
-  }, [activeJudeDetailUrl, activeThreadRef, openPreview]);
+  }, [activeJudeDetailUrl, activeJudeEnvironmentReady, activeThreadRef, openPreview]);
   const addDiffSurface = useCallback(() => {
     if (!activeThreadRef || !isServerThread || !isGitRepo) return;
     useRightPanelStore.getState().open(activeThreadRef, "diff");
@@ -6614,6 +6615,7 @@ function ChatViewContent(props: ChatViewProps) {
           attachedPreviewUrl={activeJudeVisitUrl}
           onOpenJudeDetails={openActiveJudeDetails}
           judeDetailUrl={activeJudeDetailUrl}
+          judeEnvironmentReady={activeJudeEnvironmentReady}
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
@@ -6652,6 +6654,7 @@ function ChatViewContent(props: ChatViewProps) {
             attachedPreviewUrl={activeJudeVisitUrl}
             onOpenJudeDetails={openActiveJudeDetails}
             judeDetailUrl={activeJudeDetailUrl}
+            judeEnvironmentReady={activeJudeEnvironmentReady}
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}

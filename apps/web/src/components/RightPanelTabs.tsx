@@ -62,6 +62,7 @@ interface RightPanelTabsProps {
   attachedPreviewUrl: string | null;
   onOpenJudeDetails: () => void;
   judeDetailUrl: string | null;
+  judeEnvironmentReady: boolean;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -94,6 +95,7 @@ const SURFACE_DISABLED_REASONS = {
   diff: "Diff is only available for server threads in Git repositories.",
   pullRequest: "This thread's branch has no pull request yet.",
   agents: "Agents are only available from a thread.",
+  jude: "Available when Jude finishes provisioning this environment.",
 } as const;
 
 /** Overlays that must win over the launcher's letter shortcuts. */
@@ -161,6 +163,7 @@ function RightPanelEmptyState(props: {
   attachedPreviewUrl: string | null;
   onOpenJudeDetails: () => void;
   judeDetailUrl: string | null;
+  judeEnvironmentReady: boolean;
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
@@ -184,8 +187,10 @@ function RightPanelEmptyState(props: {
             label: "Preview",
             description: "Open this Jude environment's attached preview URL in a browser.",
             icon: ExternalLinkIcon,
-            available: props.browserAvailable,
-            disabledReason: SURFACE_DISABLED_REASONS.browser,
+            available: props.browserAvailable && props.judeEnvironmentReady,
+            disabledReason: props.judeEnvironmentReady
+              ? SURFACE_DISABLED_REASONS.browser
+              : SURFACE_DISABLED_REASONS.jude,
             onClick: props.onAddAttachedPreview,
             badgeCount: 0,
           },
@@ -197,8 +202,8 @@ function RightPanelEmptyState(props: {
             label: "Jude details",
             description: "Open this environment's session details in Jude.",
             icon: ExternalLinkIcon,
-            available: true as const,
-            disabledReason: null,
+            available: props.judeEnvironmentReady,
+            disabledReason: SURFACE_DISABLED_REASONS.jude,
             onClick: props.onOpenJudeDetails,
             badgeCount: 0,
           },
@@ -716,8 +721,12 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                 <MenuPopup align="start" side="bottom" sideOffset={6} className="min-w-44">
                   {props.attachedPreviewUrl ? (
                     <SurfaceMenuItem
-                      available={props.browserAvailable}
-                      disabledReason={SURFACE_DISABLED_REASONS.browser}
+                      available={props.browserAvailable && props.judeEnvironmentReady}
+                      disabledReason={
+                        props.judeEnvironmentReady
+                          ? SURFACE_DISABLED_REASONS.browser
+                          : SURFACE_DISABLED_REASONS.jude
+                      }
                       onClick={props.onAddAttachedPreview}
                     >
                       <ExternalLinkIcon />
@@ -725,7 +734,11 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
                     </SurfaceMenuItem>
                   ) : null}
                   {props.judeDetailUrl ? (
-                    <SurfaceMenuItem available onClick={props.onOpenJudeDetails}>
+                    <SurfaceMenuItem
+                      available={props.judeEnvironmentReady}
+                      disabledReason={SURFACE_DISABLED_REASONS.jude}
+                      onClick={props.onOpenJudeDetails}
+                    >
                       <ExternalLinkIcon />
                       Jude details
                     </SurfaceMenuItem>
@@ -795,6 +808,7 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
             attachedPreviewUrl={props.attachedPreviewUrl}
             onOpenJudeDetails={props.onOpenJudeDetails}
             judeDetailUrl={props.judeDetailUrl}
+            judeEnvironmentReady={props.judeEnvironmentReady}
             onAddTerminal={props.onAddTerminal}
             onAddDiff={props.onAddDiff}
             onAddFiles={props.onAddFiles}
