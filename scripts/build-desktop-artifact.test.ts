@@ -37,6 +37,7 @@ import {
   resolveBuildOptions,
   resolveDesktopBuildIconAssets,
   resolveDesktopProductName,
+  resolveWindowsPrimaryExecutableName,
   resolveDesktopUpdateChannel,
   resolveDesktopWebAssetBrand,
   resolveResourceMonitorRustTargets,
@@ -159,6 +160,8 @@ it.layer(NodeServices.layer)("build-desktop-artifact", (it) => {
     assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42"), "T3 Code (Nightly)");
     assert.equal(resolveDesktopProductName("0.0.17", "p3"), "Prezly.code");
     assert.equal(resolveDesktopProductName("0.0.17-nightly.20260413.42", "p3"), "Prezly.code");
+    assert.equal(resolveWindowsPrimaryExecutableName("0.0.17"), "T3 Code (Alpha).exe");
+    assert.equal(resolveWindowsPrimaryExecutableName("0.0.17", "p3"), "Prezly.code.exe");
   });
 
   it.effect("builds an isolated P3 desktop identity", () =>

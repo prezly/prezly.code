@@ -2055,6 +2055,13 @@ export function resolveDesktopProductName(
     : (desktopPackageJson.productName ?? "T3 Code");
 }
 
+export function resolveWindowsPrimaryExecutableName(
+  version: string,
+  productProfileId: ProductProfileId = "t3",
+): string {
+  return `${resolveDesktopProductName(version, productProfileId)}.exe`;
+}
+
 export const createBuildConfig = Effect.fn("createBuildConfig")(function* (
   platform: typeof BuildPlatform.Type,
   target: string,
@@ -3112,7 +3119,7 @@ const buildDesktopArtifact = Effect.fn("buildDesktopArtifact")(function* (
   if (options.platform === "win") {
     yield* validateWindowsPackagedPayload({
       stageDistDir,
-      appExecutableName: `${resolveDesktopProductName(appVersion)}.exe`,
+      appExecutableName: resolveWindowsPrimaryExecutableName(appVersion, options.productProfile.id),
       targetArch: options.arch,
       verbose: options.verbose,
     });
