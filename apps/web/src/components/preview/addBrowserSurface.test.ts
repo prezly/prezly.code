@@ -71,6 +71,7 @@ describe("addBrowserSurface", () => {
     expect(openPreview).toHaveBeenCalledWith({
       threadId: "thread-1",
       url: "https://preview.example.com",
+      viewport: FILL_PREVIEW_VIEWPORT,
     });
     expect(
       selectThreadRightPanelState(useRightPanelStore.getState().byThreadKey, threadRef).surfaces,
