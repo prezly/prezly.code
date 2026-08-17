@@ -156,6 +156,13 @@ import {
 } from "../sidebarProjectGrouping";
 import type { Project } from "../types";
 import { PRODUCT_CAPABILITIES } from "../branding";
+import {
+  isJudeSessionOwnedByCurrentUser,
+  judeSessionIdFromConnectionId,
+  judeSessionOwnerLabel,
+  judeSessionProjectPickerName,
+} from "../connection/jude";
+import { useJudeCurrentUser, useJudeSessions } from "../hooks/useJudeSessions";
 
 const EMPTY_BROWSE_ENTRIES: FilesystemBrowseResult["entries"] = [];
 
@@ -588,6 +595,8 @@ function OpenCommandPaletteDialog(props: {
     reportFailure: false,
   });
   const { environments } = useEnvironments();
+  const judeSessions = useJudeSessions();
+  const judeCurrentUser = useJudeCurrentUser();
   const desktopLocalBootstraps = useDesktopLocalBootstraps();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const { activeDraftThread, activeThread, defaultProjectRef, handleNewThread } =
@@ -698,6 +707,21 @@ function OpenCommandPaletteDialog(props: {
       ),
     [clientSettings.sidebarProjectSortOrder, threads, unsortedProjectGroups],
   );
+  const judeSessionByEnvironmentId = useMemo(() => {
+    if (!PRODUCT_CAPABILITIES.managedProjects) return new Map();
+    const sessionById = new Map(judeSessions.map((session) => [session.id, session] as const));
+    return new Map(
+      environments.flatMap((environment) => {
+        const connectionId =
+          environment.entry.target._tag === "BearerConnectionTarget"
+            ? environment.entry.target.connectionId
+            : null;
+        const sessionId = judeSessionIdFromConnectionId(connectionId);
+        const session = sessionId ? sessionById.get(sessionId) : undefined;
+        return session ? ([[environment.environmentId, session]] as const) : [];
+      }),
+    );
+  }, [environments, judeSessions]);
   const contextualProjectRef = useMemo(
     () =>
       resolveThreadActionProjectRef({
@@ -718,11 +742,14 @@ function OpenCommandPaletteDialog(props: {
   );
   const pickerProjects = useMemo(
     () =>
-      projectPickerEntries.map(({ group, targetProject }) => ({
-        ...targetProject,
-        title: group.displayName,
-      })),
-    [projectPickerEntries],
+      projectPickerEntries.map(({ group, targetProject }) => {
+        const session = judeSessionByEnvironmentId.get(targetProject.environmentId);
+        return {
+          ...targetProject,
+          title: session ? judeSessionProjectPickerName(session) : group.displayName,
+        };
+      }),
+    [judeSessionByEnvironmentId, projectPickerEntries],
   );
   const projectGroupByTargetKey = useMemo(
     () =>
@@ -995,14 +1022,34 @@ function OpenCommandPaletteDialog(props: {
         valuePrefix: "project",
         searchTerms: (project) => {
           const group = projectGroupByTargetKey.get(`${project.environmentId}:${project.id}`);
-          return (
-            group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ?? []
-          );
+          const session = judeSessionByEnvironmentId.get(project.environmentId);
+          return [
+            ...(group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ??
+              []),
+            ...(session?.createdBy
+              ? [session.createdBy.login, session.createdBy.name, session.prompt]
+              : []),
+          ];
+        },
+        description: (project) => {
+          const session = judeSessionByEnvironmentId.get(project.environmentId);
+          if (!session) return project.workspaceRoot;
+          const owner = judeSessionOwnerLabel(session);
+          if (!owner) return undefined;
+          return isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+            ? `Mine · ${owner}`
+            : `By ${owner}`;
         },
         icon: projectFavicon,
         runProject: openProjectFromSearch,
       }),
-    [openProjectFromSearch, pickerProjects, projectGroupByTargetKey],
+    [
+      judeCurrentUser,
+      judeSessionByEnvironmentId,
+      openProjectFromSearch,
+      pickerProjects,
+      projectGroupByTargetKey,
+    ],
   );
 
   const projectThreadItems = useMemo(
@@ -1013,9 +1060,23 @@ function OpenCommandPaletteDialog(props: {
           valuePrefix: "new-thread-in",
           searchTerms: (project) => {
             const group = projectGroupByTargetKey.get(`${project.environmentId}:${project.id}`);
-            return (
-              group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ?? []
-            );
+            const session = judeSessionByEnvironmentId.get(project.environmentId);
+            return [
+              ...(group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ??
+                []),
+              ...(session?.createdBy
+                ? [session.createdBy.login, session.createdBy.name, session.prompt]
+                : []),
+            ];
+          },
+          description: (project) => {
+            const session = judeSessionByEnvironmentId.get(project.environmentId);
+            if (!session) return project.workspaceRoot;
+            const owner = judeSessionOwnerLabel(session);
+            if (!owner) return undefined;
+            return isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+              ? `Mine · ${owner}`
+              : `By ${owner}`;
           },
           icon: projectFavicon,
           runProject: async (project) => {
@@ -1035,7 +1096,14 @@ function OpenCommandPaletteDialog(props: {
           },
         }),
       ),
-    [contextualProjectRef, handleNewThread, pickerProjects, projectGroupByTargetKey],
+    [
+      contextualProjectRef,
+      handleNewThread,
+      judeCurrentUser,
+      judeSessionByEnvironmentId,
+      pickerProjects,
+      projectGroupByTargetKey,
+    ],
   );
 
   const allThreadItems = useMemo(
@@ -1547,7 +1615,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:create-project",
       searchTerms: ["create project", "new project", "jude", "environment", "repository"],
-      title: "Create project",
+      title: "Create Jude environment",
       icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         openCreateJudeProject();

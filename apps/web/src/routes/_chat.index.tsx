@@ -138,7 +138,7 @@ function NoProjectsHero() {
                 <div className="mt-6 flex justify-center">
                   <Button size="sm" onClick={openCreateJudeProject}>
                     <PlusIcon className="size-4" />
-                    Create project
+                    Create Jude environment
                   </Button>
                 </div>
               )}

@@ -11,12 +11,23 @@ const JudeSessionStatus = Schema.Literals([
   "unknown",
 ]);
 
+const JudeCreatorSchema = Schema.Struct({
+  kind: Schema.optional(Schema.Literals(["github-user", "service-account"])),
+  subject: Schema.optional(Schema.String),
+  id: Schema.Number,
+  login: Schema.String,
+  name: Schema.String,
+  email: Schema.optional(Schema.String),
+  avatarUrl: Schema.optional(Schema.String),
+});
+
 const JudeSessionSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   visitUrl: Schema.optional(Schema.String),
   prompt: Schema.String,
   project: Schema.String,
+  createdBy: Schema.optional(JudeCreatorSchema),
   status: JudeSessionStatus,
   urls: Schema.Struct({
     t3: Schema.String,
@@ -33,20 +44,10 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
-const JudeGitHubIdentitySchema = Schema.Struct({
-  name: Schema.String,
-  default: Schema.Boolean,
-  legacy: Schema.Boolean,
-});
-
 const JudeModelSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.optional(Schema.String),
-});
-
-const JudeGitHubIdentitiesResponseSchema = Schema.Struct({
-  identities: Schema.Array(JudeGitHubIdentitySchema),
 });
 
 const JudeModelsResponseSchema = Schema.Struct({
@@ -54,23 +55,21 @@ const JudeModelsResponseSchema = Schema.Struct({
 });
 
 const decodeJudeSessionsResponse = Schema.decodeUnknownEffect(JudeSessionsResponseSchema);
+const decodeJudeCurrentUser = Schema.decodeUnknownEffect(JudeCreatorSchema);
 const decodeJudeT3Pairing = Schema.decodeUnknownEffect(JudeT3PairingSchema);
 const decodeJudeSession = Schema.decodeUnknownEffect(JudeSessionSchema);
-const decodeJudeGitHubIdentitiesResponse = Schema.decodeUnknownEffect(
-  JudeGitHubIdentitiesResponseSchema,
-);
 const decodeJudeModelsResponse = Schema.decodeUnknownEffect(JudeModelsResponseSchema);
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
 let judeAuthenticationPromise: Promise<void> | null = null;
 
 export type JudeSession = typeof JudeSessionSchema.Type;
+export type JudeCurrentUser = typeof JudeCreatorSchema.Type;
 
 export function isJudeSessionOperational(session: JudeSession): boolean {
   return session.status === "ready" || session.status === "degraded";
 }
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
-export type JudeGitHubIdentity = typeof JudeGitHubIdentitySchema.Type;
 export type JudeModel = typeof JudeModelSchema.Type;
 
 export interface CreateJudeSessionInput {
@@ -78,13 +77,14 @@ export interface CreateJudeSessionInput {
   readonly project: string;
   readonly model: string;
   readonly baseRef: string;
-  readonly githubIdentity?: string;
   readonly customLicenses?: ReadonlyArray<string>;
 }
 
 let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
 let judeSessionsSignature = "[]";
 const judeSessionsListeners = new Set<() => void>();
+let judeCurrentUserSnapshot: JudeCurrentUser | null = null;
+const judeCurrentUserListeners = new Set<() => void>();
 let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
 const createdJudeSessionIdsListeners = new Set<() => void>();
 const judeEnvironmentRefreshListeners = new Set<() => void>();
@@ -109,6 +109,22 @@ export function judeSessionDisplayName(session: JudeSession): string {
 
 export function judeSessionProjectPickerName(session: JudeSession): string {
   return `${formatJudeAppName(session.project)} · ${judeSessionDisplayName(session)}`;
+}
+
+export function judeSessionOwnerLabel(session: JudeSession): string | null {
+  const creator = session.createdBy;
+  if (!creator) return null;
+  if (creator.kind === "service-account") {
+    return creator.name.trim() || creator.login || creator.subject || null;
+  }
+  return creator.login ? `@${creator.login}` : creator.name.trim() || null;
+}
+
+export function isJudeSessionOwnedByCurrentUser(
+  session: JudeSession,
+  user: JudeCurrentUser | null,
+): boolean {
+  return user !== null && user.id !== 0 && session.createdBy?.id === user.id;
 }
 
 export function judeSessionIdFromConnectionId(connectionId: string | null): string | null {
@@ -139,6 +155,15 @@ export function getJudeSessionsSnapshot(): ReadonlyArray<JudeSession> {
 export function subscribeToJudeSessions(listener: () => void): () => void {
   judeSessionsListeners.add(listener);
   return () => judeSessionsListeners.delete(listener);
+}
+
+export function getJudeCurrentUserSnapshot(): JudeCurrentUser | null {
+  return judeCurrentUserSnapshot;
+}
+
+export function subscribeToJudeCurrentUser(listener: () => void): () => void {
+  judeCurrentUserListeners.add(listener);
+  return () => judeCurrentUserListeners.delete(listener);
 }
 
 export function getCreatedJudeSessionIdsSnapshot(): ReadonlyArray<string> {
@@ -172,6 +197,12 @@ function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
   judeSessionsSignature = signature;
   judeSessionsSnapshot = sessions;
   for (const listener of judeSessionsListeners) listener();
+}
+
+function publishJudeCurrentUser(user: JudeCurrentUser): void {
+  if (JSON.stringify(user) === JSON.stringify(judeCurrentUserSnapshot)) return;
+  judeCurrentUserSnapshot = user;
+  for (const listener of judeCurrentUserListeners) listener();
 }
 
 function publishCreatedJudeSession(session: JudeSession): void {
@@ -255,13 +286,17 @@ export const ensureJudeAuthenticated = Effect.fn("web.jude.ensureAuthenticated")
   fetch: typeof globalThis.fetch = globalThis.fetch,
   signal?: AbortSignal,
 ) {
-  yield* requestJson({
+  const body = yield* requestJson({
     fetch,
     operation: "authentication check",
     path: "/api/auth/me",
     method: "GET",
     ...(signal ? { signal } : {}),
   });
+  const user = yield* decodeJudeCurrentUser(body).pipe(
+    Effect.mapError((cause) => discoveryError("authentication check", cause)),
+  );
+  publishJudeCurrentUser(user);
   requestJudeEnvironmentRefresh();
 });
 
@@ -299,21 +334,6 @@ export const issueJudeT3Pairing = Effect.fn("web.jude.issueT3Pairing")(function*
   return yield* decodeJudeT3Pairing(body).pipe(
     Effect.mapError((cause) => discoveryError(`T3 pairing for ${sessionId}`, cause)),
   );
-});
-
-export const listJudeGitHubIdentities = Effect.fn("web.jude.listGitHubIdentities")(function* (
-  fetch: typeof globalThis.fetch = globalThis.fetch,
-) {
-  const body = yield* requestJson({
-    fetch,
-    operation: "GitHub identity discovery",
-    path: "/api/github-identities",
-    method: "GET",
-  });
-  const response = yield* decodeJudeGitHubIdentitiesResponse(body).pipe(
-    Effect.mapError((cause) => discoveryError("GitHub identity discovery", cause)),
-  );
-  return response.identities;
 });
 
 export const listJudeModels = Effect.fn("web.jude.listModels")(function* (

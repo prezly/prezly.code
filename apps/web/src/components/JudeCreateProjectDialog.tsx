@@ -1,13 +1,7 @@
 import { GitBranchIcon, PlusIcon } from "lucide-react";
 import { type FormEvent, useEffect, useState } from "react";
-import * as Effect from "effect/Effect";
 
-import {
-  judeSessionDisplayName,
-  listJudeGitHubIdentities,
-  provisionJudeProject,
-  type JudeGitHubIdentity,
-} from "~/connection/jude";
+import { judeSessionDisplayName, provisionJudeProject } from "~/connection/jude";
 import { onCreateJudeProject } from "~/judeProjectBus";
 import { Button } from "~/components/ui/button";
 import {
@@ -20,6 +14,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Spinner } from "~/components/ui/spinner";
 import {
   Select,
   SelectItem,
@@ -54,19 +49,12 @@ function parseLicenseIds(value: string): ReadonlyArray<string> {
   return [...new Set(value.split(/[\s,]+/).filter(Boolean))];
 }
 
-function identityLabel(identity: JudeGitHubIdentity): string {
-  if (identity.legacy) return "Shared token";
-  return identity.name === "jude" ? "Jude" : identity.name;
-}
-
 export function JudeCreateProjectDialog() {
   const [open, setOpen] = useState(false);
   const [project, setProject] = useState<JudeProject>("app");
   const [name, setName] = useState("");
   const [baseRef, setBaseRef] = useState(DEFAULT_BASE_REFS.app);
-  const [githubIdentity, setGitHubIdentity] = useState("");
   const [customLicenses, setCustomLicenses] = useState("");
-  const [identities, setIdentities] = useState<ReadonlyArray<JudeGitHubIdentity>>([]);
   const [status, setStatus] = useState<"idle" | "creating">("idle");
   const [error, setError] = useState<string | null>(null);
   const busy = status !== "idle";
@@ -81,16 +69,6 @@ export function JudeCreateProjectDialog() {
     [],
   );
 
-  useEffect(() => {
-    if (!open || identities.length > 0) return;
-    void Promise.allSettled([
-      Effect.runPromise(listJudeGitHubIdentities()).then((next) => {
-        setIdentities(next);
-        setGitHubIdentity(next.find((identity) => identity.default)?.name ?? next[0]?.name ?? "");
-      }),
-    ]);
-  }, [identities.length, open]);
-
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     if (!canSubmit) return;
@@ -104,7 +82,6 @@ export function JudeCreateProjectDialog() {
           project,
           model: DEFAULT_MODEL,
           baseRef: baseRef.trim(),
-          ...(githubIdentity ? { githubIdentity } : {}),
           ...(project === "app" && customLicenses.trim()
             ? { customLicenses: parseLicenseIds(customLicenses) }
             : {}),
@@ -162,7 +139,7 @@ export function JudeCreateProjectDialog() {
           onSubmit={(event) => void handleSubmit(event)}
         >
           <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
+            <DialogTitle>Create Jude environment</DialogTitle>
             <DialogDescription>
               Provision an isolated Jude environment. It will be added to the project picker when it
               is ready.
@@ -218,31 +195,6 @@ export function JudeCreateProjectDialog() {
                 />
               </div>
             </div>
-            <div className="grid gap-2">
-              <Label>GitHub identity</Label>
-              <Select
-                value={githubIdentity}
-                onValueChange={(value) => {
-                  if (value !== null) setGitHubIdentity(value);
-                }}
-                disabled={busy || identities.length === 0}
-              >
-                <SelectTrigger>
-                  <SelectValue>
-                    {identities.find((item) => item.name === githubIdentity)
-                      ? identityLabel(identities.find((item) => item.name === githubIdentity)!)
-                      : "Configured token"}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectPopup>
-                  {identities.map((identity) => (
-                    <SelectItem key={identity.name} value={identity.name}>
-                      {identityLabel(identity)}
-                    </SelectItem>
-                  ))}
-                </SelectPopup>
-              </Select>
-            </div>
             {project === "app" ? (
               <div className="grid gap-2">
                 <Label htmlFor="jude-license-ids">
@@ -274,9 +226,18 @@ export function JudeCreateProjectDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              <PlusIcon className="size-4" />
-              Create Jude environment
+            <Button type="submit" disabled={!canSubmit} aria-busy={busy}>
+              {busy ? (
+                <>
+                  <Spinner className="size-4" />
+                  Creating Jude environment…
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="size-4" />
+                  Create Jude environment
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>

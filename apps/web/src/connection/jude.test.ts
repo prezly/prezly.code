@@ -10,10 +10,13 @@ import {
   ensureJudeAuthenticated,
   formatJudeAppName,
   getCreatedJudeSessionIdsSnapshot,
+  getJudeCurrentUserSnapshot,
   getJudeSessionsSnapshot,
+  isJudeSessionOwnedByCurrentUser,
   issueJudeT3Pairing,
   judeSessionDisplayName,
   judeSessionNameForConnection,
+  judeSessionOwnerLabel,
   judeSessionProjectPickerName,
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
@@ -58,6 +61,40 @@ describe("Jude discovery", () => {
     expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
   });
 
+  it("formats Jude owners and identifies the current user's sessions", () => {
+    const user = {
+      kind: "github-user" as const,
+      id: 42,
+      login: "octocat",
+      name: "The Octocat",
+    };
+    const mine = {
+      id: "admin-fix-search",
+      name: "admin-fix-search",
+      prompt: "Fix search",
+      project: "admin-v2",
+      createdBy: user,
+      status: "ready" as const,
+      urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
+    };
+    const machineOwned = {
+      ...mine,
+      id: "admin-review-search",
+      createdBy: {
+        kind: "service-account" as const,
+        subject: "hermes-agent/reviewer",
+        id: 0,
+        login: "",
+        name: "Review agent",
+      },
+    };
+
+    expect(judeSessionOwnerLabel(mine)).toBe("@octocat");
+    expect(judeSessionOwnerLabel(machineOwned)).toBe("Review agent");
+    expect(isJudeSessionOwnedByCurrentUser(mine, user)).toBe(true);
+    expect(isJudeSessionOwnedByCurrentUser(machineOwned, user)).toBe(false);
+  });
+
   it("notifies the platform when a manual refresh is requested", () => {
     const listener = vi.fn();
     const unsubscribe = subscribeToJudeEnvironmentRefresh(listener);
@@ -82,6 +119,12 @@ describe("Jude discovery", () => {
               visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
               prompt: "Fix search",
               project: "admin-v2",
+              createdBy: {
+                kind: "github-user",
+                id: 42,
+                login: "octocat",
+                name: "The Octocat",
+              },
               status: "degraded",
               urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
               ignored: "field",
@@ -97,6 +140,12 @@ describe("Jude discovery", () => {
           visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
           prompt: "Fix search",
           project: "admin-v2",
+          createdBy: {
+            kind: "github-user",
+            id: 42,
+            login: "octocat",
+            name: "The Octocat",
+          },
           status: "degraded",
           urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
         },
@@ -140,13 +189,16 @@ describe("Jude discovery", () => {
 
   it.effect("checks Jude authentication during P3 bootstrap", () =>
     Effect.gen(function* () {
-      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(Response.json({ id: 42 }));
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(Response.json({ id: 42, login: "octocat", name: "The Octocat" }));
       const refreshListener = vi.fn();
       const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
 
       yield* ensureJudeAuthenticated(fetch);
 
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/auth/me", { method: "GET" });
+      expect(getJudeCurrentUserSnapshot()).toMatchObject({ id: 42, login: "octocat" });
       expect(refreshListener).toHaveBeenCalledOnce();
       unsubscribe();
     }),
@@ -192,7 +244,6 @@ describe("Jude discovery", () => {
         project: "website",
         model: "gpt-5.6-sol",
         baseRef: "main",
-        githubIdentity: "coding-agent",
       };
       expect(yield* createJudeSession(input, fetch)).toMatchObject({
         id: "website-improve-search",
@@ -209,7 +260,7 @@ describe("Jude discovery", () => {
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main","githubIdentity":"coding-agent"}',
+        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main"}',
       });
     }),
   );
