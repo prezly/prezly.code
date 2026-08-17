@@ -44,20 +44,10 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
-const JudeGitHubIdentitySchema = Schema.Struct({
-  name: Schema.String,
-  default: Schema.Boolean,
-  legacy: Schema.Boolean,
-});
-
 const JudeModelSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
   description: Schema.optional(Schema.String),
-});
-
-const JudeGitHubIdentitiesResponseSchema = Schema.Struct({
-  identities: Schema.Array(JudeGitHubIdentitySchema),
 });
 
 const JudeModelsResponseSchema = Schema.Struct({
@@ -68,9 +58,6 @@ const decodeJudeSessionsResponse = Schema.decodeUnknownEffect(JudeSessionsRespon
 const decodeJudeCurrentUser = Schema.decodeUnknownEffect(JudeCreatorSchema);
 const decodeJudeT3Pairing = Schema.decodeUnknownEffect(JudeT3PairingSchema);
 const decodeJudeSession = Schema.decodeUnknownEffect(JudeSessionSchema);
-const decodeJudeGitHubIdentitiesResponse = Schema.decodeUnknownEffect(
-  JudeGitHubIdentitiesResponseSchema,
-);
 const decodeJudeModelsResponse = Schema.decodeUnknownEffect(JudeModelsResponseSchema);
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
 
@@ -83,7 +70,6 @@ export function isJudeSessionOperational(session: JudeSession): boolean {
   return session.status === "ready" || session.status === "degraded";
 }
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
-export type JudeGitHubIdentity = typeof JudeGitHubIdentitySchema.Type;
 export type JudeModel = typeof JudeModelSchema.Type;
 
 export interface CreateJudeSessionInput {
@@ -91,7 +77,6 @@ export interface CreateJudeSessionInput {
   readonly project: string;
   readonly model: string;
   readonly baseRef: string;
-  readonly githubIdentity?: string;
   readonly customLicenses?: ReadonlyArray<string>;
 }
 
@@ -349,21 +334,6 @@ export const issueJudeT3Pairing = Effect.fn("web.jude.issueT3Pairing")(function*
   return yield* decodeJudeT3Pairing(body).pipe(
     Effect.mapError((cause) => discoveryError(`T3 pairing for ${sessionId}`, cause)),
   );
-});
-
-export const listJudeGitHubIdentities = Effect.fn("web.jude.listGitHubIdentities")(function* (
-  fetch: typeof globalThis.fetch = globalThis.fetch,
-) {
-  const body = yield* requestJson({
-    fetch,
-    operation: "GitHub identity discovery",
-    path: "/api/github-identities",
-    method: "GET",
-  });
-  const response = yield* decodeJudeGitHubIdentitiesResponse(body).pipe(
-    Effect.mapError((cause) => discoveryError("GitHub identity discovery", cause)),
-  );
-  return response.identities;
 });
 
 export const listJudeModels = Effect.fn("web.jude.listModels")(function* (

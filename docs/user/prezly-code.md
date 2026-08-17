@@ -4,8 +4,8 @@ Connect to the Prezly network through Warp. If the Jude login is missing or expi
 opens a GitHub sign-in window and resumes environment discovery after authentication succeeds.
 
 Choose **Create project** in the left sidebar, the new-prompt project picker, the empty project
-screen, or the command palette. Select the repository, branch, GitHub identity, and model for the
-new Jude environment. Prezly projects can also include optional custom license IDs.
+screen, or the command palette. Select the repository and branch for the new Jude environment. Jude
+uses your logged-in GitHub identity. Prezly projects can also include optional custom license IDs.
 
 Once Jude accepts the environment, Prezly.code closes the dialog and immediately shows the app name
 in the left sidebar with its provisioning status. Only environments created in the running app get

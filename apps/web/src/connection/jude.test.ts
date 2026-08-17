@@ -244,7 +244,6 @@ describe("Jude discovery", () => {
         project: "website",
         model: "gpt-5.6-sol",
         baseRef: "main",
-        githubIdentity: "coding-agent",
       };
       expect(yield* createJudeSession(input, fetch)).toMatchObject({
         id: "website-improve-search",
@@ -261,7 +260,7 @@ describe("Jude discovery", () => {
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main","githubIdentity":"coding-agent"}',
+        body: '{"prompt":"Improve search","project":"website","model":"gpt-5.6-sol","baseRef":"main"}',
       });
     }),
   );
