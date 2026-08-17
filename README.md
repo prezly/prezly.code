@@ -89,6 +89,8 @@ contains upstream's earlier `v0.0.x` tags.
 
 Create and push a version tag from the commit to release:
 
+Stable:
+
 ```bash
 git tag -a v0.1.0 -m "Prezly.code v0.1.0"
 git push origin v0.1.0
@@ -172,6 +174,8 @@ Checkout their getting started guide for more information: https://viteplus.dev/
 vp i
 ```
 
-Read [CONTRIBUTING.md](./CONTRIBUTING.md) before opening an issue or PR.
+Read [CONTRIBUTING.md](./CONTRIBUTING.md) before reporting a bug or opening a PR.
+
+Have a feature request? Start an [Ideas discussion](https://github.com/pingdotgg/t3code/discussions/categories/ideas).
 
 Need support? Join the [Discord](https://discord.gg/jn4EGJjrvv).

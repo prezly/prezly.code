@@ -65,6 +65,7 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.browserArtifactsDir, "/tmp/t3/userdata/browser-artifacts");
       assert.equal(environment.rootDir, "/repo");
       assert.equal(environment.appRoot, "/repo");
+      assert.equal(environment.serverRoot, "/repo");
       assert.equal(environment.backendEntryPath, "/repo/apps/server/dist/bin.mjs");
       assert.equal(environment.backendCwd, "/repo");
       assert.equal(environment.appUserModelId, "com.t3tools.t3code.dev");
@@ -112,10 +113,6 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.appUserModelId, "com.prezly.p3code");
       assert.equal(environment.linuxDesktopEntryName, "p3code.desktop");
       assert.equal(environment.linuxWmClass, "p3code");
-      assert.equal(
-        environment.developmentDockIconPath,
-        "/repo/assets/p3/prezly-code-macos-1024.png",
-      );
       assert.isFalse(environment.productProfile.capabilities.allowLocalEnvironment);
       assert.isFalse(environment.productProfile.capabilities.allowWorktreeManagement);
       assert.equal(environment.productProfile.capabilities.fixedWorkspaceRoot, "/source");
@@ -135,6 +132,24 @@ describe("DesktopEnvironment", () => {
       assert.equal(environment.baseDir, "/isolated/p3");
       assert.equal(environment.stateDir, "/isolated/p3/userdata");
       assert.notEqual(environment.baseDir, "/shared/t3");
+    }),
+  );
+
+  it.effect("uses the packaged Windows server sidecar as the backend root", () =>
+    Effect.gen(function* () {
+      const environment = yield* makeEnvironment({
+        platform: "win32",
+        isPackaged: true,
+        appPath: "/install/resources/app.asar",
+        resourcesPath: "/install/resources",
+      });
+
+      assert.equal(environment.appRoot, "/install/resources/app.asar");
+      assert.equal(environment.serverRoot, "/install/resources/server.asar");
+      assert.equal(
+        environment.backendEntryPath,
+        "/install/resources/server.asar/apps/server/dist/bin.mjs",
+      );
     }),
   );
 
