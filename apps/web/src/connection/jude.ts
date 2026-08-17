@@ -5,6 +5,7 @@ import * as Schema from "effect/Schema";
 const JudeSessionStatus = Schema.Literals([
   "provisioning",
   "ready",
+  "degraded",
   "failed",
   "deleting",
   "unknown",
@@ -64,6 +65,10 @@ const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.
 let judeAuthenticationPromise: Promise<void> | null = null;
 
 export type JudeSession = typeof JudeSessionSchema.Type;
+
+export function isJudeSessionOperational(session: JudeSession): boolean {
+  return session.status === "ready" || session.status === "degraded";
+}
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
 export type JudeGitHubIdentity = typeof JudeGitHubIdentitySchema.Type;
 export type JudeModel = typeof JudeModelSchema.Type;
@@ -378,7 +383,7 @@ export async function provisionJudeProject(
   const deadline = Date.now() + (options.timeoutMs ?? 15 * 60_000);
 
   while (Date.now() < deadline) {
-    if (created.status === "ready") {
+    if (isJudeSessionOperational(created)) {
       requestJudeEnvironmentRefresh();
       return created;
     }
@@ -392,7 +397,7 @@ export async function provisionJudeProject(
     if (!session) {
       continue;
     }
-    if (session.status === "ready") {
+    if (isJudeSessionOperational(session)) {
       requestJudeEnvironmentRefresh();
       return session;
     }

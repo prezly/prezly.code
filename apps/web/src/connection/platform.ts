@@ -493,6 +493,10 @@ export function canRetainCachedPlatformRegistrationAfterRefreshFailure(
   );
 }
 
+export function canConnectToJudeT3Session(session: JudeSession): boolean {
+  return session.status !== "deleting" && session.urls.t3.trim().length > 0;
+}
+
 export function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
@@ -546,12 +550,10 @@ const platformConnectionSourceLayer = Layer.effect(
 
         const next = new Map<string, CachedPlatformRegistration>();
         const registrations: PlatformConnectionRegistration[] = [];
-        const readySessions = sessionsResult.success.filter(
-          (session) => session.status === "ready" && session.urls.t3.trim().length > 0,
-        );
+        const connectableSessions = sessionsResult.success.filter(canConnectToJudeT3Session);
 
         yield* Effect.forEach(
-          readySessions,
+          connectableSessions,
           (session) =>
             Effect.gen(function* () {
               const cacheKey = `jude:${session.id}`;

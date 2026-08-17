@@ -82,7 +82,7 @@ describe("Jude discovery", () => {
               visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
               prompt: "Fix search",
               project: "admin-v2",
-              status: "ready",
+              status: "degraded",
               urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
               ignored: "field",
             },
@@ -97,7 +97,7 @@ describe("Jude discovery", () => {
           visitUrl: "https://admin-fix-search.admin-v2.jude.prezly.dev",
           prompt: "Fix search",
           project: "admin-v2",
-          status: "ready",
+          status: "degraded",
           urls: { t3: "https://admin-fix-search.t3.jude.prezly.dev" },
         },
       ]);
@@ -223,15 +223,15 @@ describe("Jude discovery", () => {
       status: "provisioning",
       urls: { t3: "" },
     };
-    const ready = {
+    const degraded = {
       ...provisioning,
-      status: "ready",
+      status: "degraded",
       urls: { t3: "https://website-improve-search.t3.jude.prezly.dev" },
     };
     const fetch = vi
       .fn<typeof globalThis.fetch>()
       .mockResolvedValueOnce(Response.json(provisioning, { status: 201 }))
-      .mockResolvedValueOnce(Response.json({ sessions: [ready] }));
+      .mockResolvedValueOnce(Response.json({ sessions: [degraded] }));
     const refreshListener = vi.fn();
     const unsubscribe = subscribeToJudeEnvironmentRefresh(refreshListener);
 
@@ -245,7 +245,7 @@ describe("Jude discovery", () => {
         },
         { fetch, pollIntervalMs: 0 },
       ),
-    ).resolves.toMatchObject({ status: "ready" });
+    ).resolves.toMatchObject({ status: "degraded" });
     expect(fetch).toHaveBeenCalledTimes(2);
     expect(refreshListener).toHaveBeenCalledOnce();
     unsubscribe();

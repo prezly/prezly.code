@@ -9,6 +9,7 @@ import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
 import {
+  canConnectToJudeT3Session,
   canRetainCachedPlatformRegistrationAfterRefreshFailure,
   canReuseCachedPlatformRegistration,
   primaryRegistrationToRetainAfterTopologyRead,
@@ -18,6 +19,29 @@ import {
   secondaryBearerExpiresAtEpochMs,
   secondaryBearerRefreshAtEpochMs,
 } from "./platform.ts";
+
+describe("Jude T3 discovery", () => {
+  const session = {
+    id: "app-fix",
+    name: "app-fix",
+    prompt: "Fix the app",
+    project: "app",
+    status: "ready" as const,
+    urls: { t3: "https://app-fix.t3.jude.prezly.dev" },
+  };
+
+  it.each(["provisioning", "ready", "degraded", "failed", "unknown"] as const)(
+    "uses T3 availability instead of the overall %s status",
+    (status) => {
+      expect(canConnectToJudeT3Session({ ...session, status })).toBe(true);
+    },
+  );
+
+  it("does not connect sessions that are deleting or have no T3 endpoint", () => {
+    expect(canConnectToJudeT3Session({ ...session, status: "deleting" })).toBe(false);
+    expect(canConnectToJudeT3Session({ ...session, urls: { t3: " " } })).toBe(false);
+  });
+});
 
 const TARGET: DesktopSshEnvironmentTarget = {
   alias: "devbox",

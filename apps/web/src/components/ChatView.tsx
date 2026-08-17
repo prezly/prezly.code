@@ -240,6 +240,7 @@ import {
 import { vcsEnvironment } from "../state/vcs";
 import { useEnvironments, usePrimaryEnvironment } from "../state/environments";
 import {
+  isJudeSessionOperational,
   judeSessionDetailUrlForConnection,
   judeSessionForConnection,
   judeSessionNameForConnection,
@@ -1808,7 +1809,9 @@ function ChatViewContent(props: ChatViewProps) {
     ? judeSessionForConnection(activeEnvironmentConnectionId, judeSessions)
     : null;
   const activeJudeVisitUrl = activeJudeSession?.visitUrl?.trim() || null;
-  const activeJudeEnvironmentReady = activeJudeSession?.status === "ready";
+  const activeJudeEnvironmentReady = activeJudeSession
+    ? isJudeSessionOperational(activeJudeSession)
+    : false;
   const activeJudeDetailUrl = PRODUCT_PROFILE.judeBaseUrl
     ? judeSessionDetailUrlForConnection(PRODUCT_PROFILE.judeBaseUrl, activeEnvironmentConnectionId)
     : null;

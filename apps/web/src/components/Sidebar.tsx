@@ -3491,9 +3491,11 @@ export default function Sidebar() {
                       ? "Failed"
                       : session.status === "ready"
                         ? "Connecting…"
-                        : session.status === "deleting"
-                          ? "Deleting…"
-                          : "Provisioning…";
+                        : session.status === "degraded"
+                          ? "Degraded"
+                          : session.status === "deleting"
+                            ? "Deleting…"
+                            : "Provisioning…";
                   return (
                     <SidebarMenuButton
                       key={session.id}
