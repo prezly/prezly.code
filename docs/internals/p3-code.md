@@ -16,9 +16,10 @@ thread, and orchestration internals while replacing local environment management
   provisions a Jude session, publishes it to the client snapshot, waits for it to become ready, and
   then refreshes the managed project list. The Jude session itself provides the isolated checkout.
 - P3 uses the Jude session prompt as the user-facing environment name in the sidebar and thread
-  breadcrumbs. The project picker prefixes that name with the Jude app. When Jude exposes a
-  `visitUrl`, P3 offers it as an attached **Preview** browser surface in the right panel; the panel
-  also links to the environment's Jude session details.
+  breadcrumbs. The project picker prefixes that name with the Jude app, groups the current user's
+  sessions separately, and presents Jude's `createdBy` identity instead of the invariant `/source`
+  path. When Jude exposes a `visitUrl`, P3 offers it as an attached **Preview** browser surface in
+  the right panel; the panel also links to the environment's Jude session details.
 - P3 relies on network access through Warp and authenticates to Jude with Jude's GitHub OAuth
   session. Discovery follows Jude's authenticated, user-visible session list.
 - P3 keeps the shared pull-request review and T3 Connect implementations in the build, but its

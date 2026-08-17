@@ -2,9 +2,12 @@ import { useSyncExternalStore } from "react";
 
 import {
   getCreatedJudeSessionIdsSnapshot,
+  getJudeCurrentUserSnapshot,
   getJudeSessionsSnapshot,
   subscribeToCreatedJudeSessionIds,
+  subscribeToJudeCurrentUser,
   subscribeToJudeSessions,
+  type JudeCurrentUser,
   type JudeSession,
 } from "../connection/jude";
 
@@ -17,6 +20,10 @@ export function useJudeSessions(): ReadonlyArray<JudeSession> {
     getJudeSessionsSnapshot,
     () => EMPTY_JUDE_SESSIONS,
   );
+}
+
+export function useJudeCurrentUser(): JudeCurrentUser | null {
+  return useSyncExternalStore(subscribeToJudeCurrentUser, getJudeCurrentUserSnapshot, () => null);
 }
 
 export function useCreatedJudeSessionIds(): ReadonlyArray<string> {

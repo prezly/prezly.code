@@ -105,9 +105,11 @@ import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import {
   dismissCreatedJudeSession,
+  isJudeSessionOwnedByCurrentUser,
   judeSessionDetailUrlForConnection,
   judeSessionDisplayName,
   judeSessionIdFromConnectionId,
+  judeSessionOwnerLabel,
   judeSessionProjectPickerName,
   refreshJudeEnvironments,
 } from "../connection/jude";
@@ -117,7 +119,11 @@ import { useLocalStorage } from "../hooks/useLocalStorage";
 import { useNowMinute } from "../hooks/useNowMinute";
 import { useEnvironments, usePrimaryEnvironmentId } from "../state/environments";
 import { useProjects, useThreadShells } from "../state/entities";
-import { useCreatedJudeSessionIds, useJudeSessions } from "../hooks/useJudeSessions";
+import {
+  useCreatedJudeSessionIds,
+  useJudeCurrentUser,
+  useJudeSessions,
+} from "../hooks/useJudeSessions";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
 import { vcsEnvironment } from "../state/vcs";
 import { threadEnvironment } from "../state/threads";
@@ -187,7 +193,15 @@ import { useThreadRunningTerminalIds } from "../state/terminalSessions";
 import { stackedThreadToast, toastManager } from "./ui/toast";
 import { Button } from "./ui/button";
 import { Input } from "./ui/input";
-import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "./ui/menu";
+import {
+  Menu,
+  MenuGroup,
+  MenuGroupLabel,
+  MenuPopup,
+  MenuRadioGroup,
+  MenuRadioItem,
+  MenuTrigger,
+} from "./ui/menu";
 import { SidebarContent, SidebarGroup, SidebarMenuButton, useSidebar } from "./ui/sidebar";
 import { SidebarChromeFooter, SidebarChromeHeader } from "./sidebar/SidebarChrome";
 import { Popover, PopoverPopup, PopoverTrigger } from "./ui/popover";
@@ -1815,6 +1829,7 @@ export default function Sidebar() {
   }, []);
   const { environments } = useEnvironments();
   const judeSessions = useJudeSessions();
+  const judeCurrentUser = useJudeCurrentUser();
   const createdJudeSessionIds = useCreatedJudeSessionIds();
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
@@ -2017,6 +2032,20 @@ export default function Sidebar() {
     },
     [judeSessionByEnvironmentId],
   );
+  const projectPickerSections = useMemo(() => {
+    if (!PRODUCT_CAPABILITIES.managedProjects || judeCurrentUser === null) {
+      return [{ label: null, projects: projectGroups }];
+    }
+    const mine = projectGroups.filter((project) => {
+      const session = judeSessionByEnvironmentId.get(project.environmentId);
+      return session ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser) : false;
+    });
+    const others = projectGroups.filter((project) => !mine.includes(project));
+    return [
+      ...(mine.length > 0 ? [{ label: "My projects", projects: mine }] : []),
+      ...(others.length > 0 ? [{ label: "Other projects", projects: others }] : []),
+    ];
+  }, [judeCurrentUser, judeSessionByEnvironmentId, projectGroups]);
   const scopedProjectKeys = useMemo(
     () =>
       scopedProjectGroup === null
@@ -3682,41 +3711,62 @@ export default function Sidebar() {
                         <FolderIcon className="size-4 shrink-0" />
                         <span className="min-w-0 truncate text-sm">All projects</span>
                       </MenuRadioItem>
-                      {projectGroups.map((project) => {
-                        const scopeKey = project.projectKey;
-                        const pickerDisplayName = projectPickerDisplayName(project);
-                        return (
-                          <MenuRadioItem
-                            key={scopeKey}
-                            value={scopeKey}
-                            closeOnClick
-                            className="h-8 min-h-8 px-1 py-0 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
-                          >
-                            <ProjectFavicon
-                              environmentId={project.environmentId}
-                              cwd={project.workspaceRoot}
-                              faviconPath={project.faviconPath}
-                              className="size-4 shrink-0"
-                            />
-                            <span className="min-w-0 truncate text-sm">{pickerDisplayName}</span>
-                            {PRODUCT_CAPABILITIES.allowProjectManagement ? (
-                              <Button
-                                size="icon-xs"
-                                variant="ghost-muted"
-                                aria-label={`Project settings for ${project.displayName}`}
-                                title={`Project settings for ${project.displayName}`}
-                                className="ml-auto size-6 [--control-icon-color:currentColor] text-icon-muted focus-visible:bg-accent focus-visible:text-foreground"
-                                onPointerDown={(event) => event.stopPropagation()}
-                                onClick={(event) => {
-                                  void handleProjectSettings(event, project);
-                                }}
+                      {projectPickerSections.map((section) => (
+                        <MenuGroup key={section.label ?? "projects"}>
+                          {section.label ? (
+                            <MenuGroupLabel className="px-1.5 pb-0.5 pt-2 first:pt-1">
+                              {section.label}
+                            </MenuGroupLabel>
+                          ) : null}
+                          {section.projects.map((project) => {
+                            const scopeKey = project.projectKey;
+                            const pickerDisplayName = projectPickerDisplayName(project);
+                            const session = judeSessionByEnvironmentId.get(project.environmentId);
+                            const ownerLabel = session ? judeSessionOwnerLabel(session) : null;
+                            const isMine = session
+                              ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+                              : false;
+                            return (
+                              <MenuRadioItem
+                                key={scopeKey}
+                                value={scopeKey}
+                                closeOnClick
+                                className="min-h-10 px-1 py-1 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
                               >
-                                <SettingsIcon className="size-3.5" />
-                              </Button>
-                            ) : null}
-                          </MenuRadioItem>
-                        );
-                      })}
+                                <ProjectFavicon
+                                  environmentId={project.environmentId}
+                                  cwd={project.workspaceRoot}
+                                  faviconPath={project.faviconPath}
+                                  className="size-4 shrink-0"
+                                />
+                                <span className="flex min-w-0 flex-1 flex-col">
+                                  <span className="truncate text-sm">{pickerDisplayName}</span>
+                                  {ownerLabel ? (
+                                    <span className="truncate font-normal text-muted-foreground text-xs">
+                                      {isMine ? `Mine · ${ownerLabel}` : `By ${ownerLabel}`}
+                                    </span>
+                                  ) : null}
+                                </span>
+                                {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                                  <Button
+                                    size="icon-xs"
+                                    variant="ghost-muted"
+                                    aria-label={`Project settings for ${project.displayName}`}
+                                    title={`Project settings for ${project.displayName}`}
+                                    className="ml-auto size-6 [--control-icon-color:currentColor] text-icon-muted focus-visible:bg-accent focus-visible:text-foreground"
+                                    onPointerDown={(event) => event.stopPropagation()}
+                                    onClick={(event) => {
+                                      void handleProjectSettings(event, project);
+                                    }}
+                                  >
+                                    <SettingsIcon className="size-3.5" />
+                                  </Button>
+                                ) : null}
+                              </MenuRadioItem>
+                            );
+                          })}
+                        </MenuGroup>
+                      ))}
                     </MenuRadioGroup>
                   </MenuPopup>
                 </Menu>
