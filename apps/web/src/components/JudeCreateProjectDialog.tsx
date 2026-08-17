@@ -14,6 +14,7 @@ import {
 } from "~/components/ui/dialog";
 import { Input } from "~/components/ui/input";
 import { Label } from "~/components/ui/label";
+import { Spinner } from "~/components/ui/spinner";
 import {
   Select,
   SelectItem,
@@ -225,9 +226,18 @@ export function JudeCreateProjectDialog() {
             <Button type="button" variant="outline" onClick={() => setOpen(false)} disabled={busy}>
               Cancel
             </Button>
-            <Button type="submit" disabled={!canSubmit}>
-              <PlusIcon className="size-4" />
-              Create Jude environment
+            <Button type="submit" disabled={!canSubmit} aria-busy={busy}>
+              {busy ? (
+                <>
+                  <Spinner className="size-4" />
+                  Creating environment…
+                </>
+              ) : (
+                <>
+                  <PlusIcon className="size-4" />
+                  Create Jude environment
+                </>
+              )}
             </Button>
           </DialogFooter>
         </form>
