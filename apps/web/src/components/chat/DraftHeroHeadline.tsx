@@ -159,7 +159,7 @@ export function DraftHeroHeadline({
             <MenuSeparator />
             <MenuItem onClick={openCreateProject}>
               <FolderPlusIcon />
-              Create project
+              {PRODUCT_CAPABILITIES.managedProjects ? "Create Jude environment" : "Create project"}
             </MenuItem>
           </>
         ) : null}

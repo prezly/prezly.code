@@ -1615,7 +1615,7 @@ function OpenCommandPaletteDialog(props: {
       kind: "action",
       value: "action:create-project",
       searchTerms: ["create project", "new project", "jude", "environment", "repository"],
-      title: "Create project",
+      title: "Create Jude environment",
       icon: <FolderPlusIcon className={ITEM_ICON_CLASS} />,
       run: async () => {
         openCreateJudeProject();

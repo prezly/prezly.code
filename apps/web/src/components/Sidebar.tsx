@@ -3609,7 +3609,7 @@ export default function Sidebar() {
                   className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                 >
                   <FolderPlusIcon className="size-4 shrink-0" />
-                  <span>Create project</span>
+                  <span>Create Jude environment</span>
                 </SidebarMenuButton>
                 {managedJudeProjectRows.map(({ session, project }) => {
                   const displayName = judeSessionDisplayName(session);

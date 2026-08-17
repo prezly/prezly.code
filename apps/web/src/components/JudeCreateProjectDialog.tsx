@@ -139,7 +139,7 @@ export function JudeCreateProjectDialog() {
           onSubmit={(event) => void handleSubmit(event)}
         >
           <DialogHeader>
-            <DialogTitle>Create project</DialogTitle>
+            <DialogTitle>Create Jude environment</DialogTitle>
             <DialogDescription>
               Provision an isolated Jude environment. It will be added to the project picker when it
               is ready.
@@ -230,7 +230,7 @@ export function JudeCreateProjectDialog() {
               {busy ? (
                 <>
                   <Spinner className="size-4" />
-                  Creating environment…
+                  Creating Jude environment…
                 </>
               ) : (
                 <>
