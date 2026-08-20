@@ -169,6 +169,18 @@ function persistRequestedJudeEnvironmentConnectionIds(): void {
   }
 }
 
+function pruneRequestedJudeEnvironmentConnectionIds(sessions: ReadonlyArray<JudeSession>): void {
+  const availableIds = new Set(sessions.map((session) => session.id));
+  let changed = false;
+  for (const sessionId of requestedJudeEnvironmentConnectionIds) {
+    if (!availableIds.has(sessionId)) {
+      requestedJudeEnvironmentConnectionIds.delete(sessionId);
+      changed = true;
+    }
+  }
+  if (changed) persistRequestedJudeEnvironmentConnectionIds();
+}
+
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
 
 const JUDE_APP_NAMES: Readonly<Record<string, string>> = {
@@ -427,6 +439,7 @@ export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
     const response = yield* decodeJudeSessionsResponse(body).pipe(
       Effect.mapError((cause) => discoveryError("session discovery", cause)),
     );
+    pruneRequestedJudeEnvironmentConnectionIds(response.sessions);
     publishJudeSessions(response.sessions);
     publishJudeSessionDiscoveryState("ready");
     return response.sessions;
@@ -480,6 +493,7 @@ export const listJudeT3Environments = Effect.fn("web.jude.listT3Environments")(f
   const rawSnapshot = yield* decodeJudeT3EnvironmentsResponse(body).pipe(
     Effect.mapError((cause) => discoveryError("T3 environment discovery", cause)),
   );
+  pruneRequestedJudeEnvironmentConnectionIds(rawSnapshot.environments);
   publishJudeSessions(rawSnapshot.environments);
   publishJudeSessionDiscoveryState("ready");
   return {

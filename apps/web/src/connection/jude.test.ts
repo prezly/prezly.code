@@ -13,6 +13,7 @@ import {
   getJudeCurrentUserSnapshot,
   getJudeSessionDiscoveryStateSnapshot,
   getJudeSessionsSnapshot,
+  isJudeEnvironmentConnectionRequested,
   isJudeSessionOwnedByCurrentUser,
   issueJudeT3Pairing,
   judeSessionBranchName,
@@ -27,6 +28,7 @@ import {
   listJudeSessions,
   provisionJudeProject,
   requestJudeEnvironmentRefresh,
+  requestJudeEnvironmentConnection,
   subscribeToJudeEnvironmentRefresh,
 } from "./jude.ts";
 
@@ -252,6 +254,21 @@ describe("Jude discovery", () => {
       const snapshot = yield* listJudeT3Environments(null, fetch);
       expect(snapshot).toMatchObject({ _tag: "Updated", revision: "43" });
       expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
+    }),
+  );
+
+  it.effect("forgets opted-in environments that Jude no longer returns", () =>
+    Effect.gen(function* () {
+      const removedSessionId = "removed-shared-environment";
+      requestJudeEnvironmentConnection(removedSessionId);
+      expect(isJudeEnvironmentConnectionRequested(removedSessionId)).toBe(true);
+
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(Response.json({ revision: "44", environments: [] }));
+      yield* listJudeT3Environments(null, fetch);
+
+      expect(isJudeEnvironmentConnectionRequested(removedSessionId)).toBe(false);
     }),
   );
 
