@@ -41,6 +41,7 @@ import {
   LinkIcon,
   MessageSquareIcon,
   PaletteIcon,
+  ServerIcon,
   SettingsIcon,
   SquarePenIcon,
   TextSearchIcon,
@@ -132,7 +133,11 @@ import { ProjectFavicon } from "./ProjectFavicon";
 import { ProjectFilePicker } from "./files/ProjectFilePicker";
 import { ProjectContentSearchDialog } from "./search/ProjectContentSearchDialog";
 import { toggleThemeEditorForTheme } from "./settings/themeEditorStore";
-import { ThreadCommandSubtitle } from "./ThreadCommandSubtitle";
+import {
+  COMMAND_PALETTE_META_ICON_CLASS,
+  CommandPaletteMetaDot,
+  ThreadCommandSubtitle,
+} from "./ThreadCommandSubtitle";
 import { ThreadRowLeadingStatus, ThreadRowTrailingStatus } from "./ThreadStatusIndicators";
 import { primaryServerKeybindingsAtom, primaryServerProvidersAtom } from "../state/server";
 import {
@@ -150,6 +155,7 @@ import { ComposerHandleContext, useComposerHandleContext } from "../composerHand
 import type { ChatComposerHandle } from "./chat/ChatComposer";
 import { getProjectOrderKey, selectProjectGroupingSettings } from "../logicalProject";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
+import { selectSidebarProjectScope } from "../sidebarProjectScopeBus";
 import {
   buildSidebarProjectPickerEntries,
   buildSidebarProjectSnapshots,
@@ -158,9 +164,11 @@ import type { Project } from "../types";
 import { PRODUCT_CAPABILITIES } from "../branding";
 import {
   isJudeSessionOwnedByCurrentUser,
+  judeSessionBranchName,
   judeSessionIdFromConnectionId,
   judeSessionOwnerLabel,
   judeSessionProjectPickerName,
+  requestJudeEnvironmentConnection,
 } from "../connection/jude";
 import { useJudeCurrentUser, useJudeSessions } from "../hooks/useJudeSessions";
 
@@ -505,7 +513,6 @@ export function CommandPalette({ children }: { children: ReactNode }) {
       >
         {children}
         <CommandPaletteDialog
-          open={state.open}
           mode={state.mode}
           openIntent={state.openIntent}
           setOpen={setOpen}
@@ -518,7 +525,6 @@ export function CommandPalette({ children }: { children: ReactNode }) {
 }
 
 function CommandPaletteDialog(props: {
-  readonly open: boolean;
   readonly mode: SearchOverlayMode;
   readonly openIntent: CommandPaletteOpenIntent | null;
   readonly setOpen: (open: boolean) => void;
@@ -526,10 +532,6 @@ function CommandPaletteDialog(props: {
   readonly clearOpenIntent: () => void;
 }) {
   const composerHandleRef = useComposerHandleContext();
-
-  if (!props.open) {
-    return null;
-  }
 
   return (
     <CommandDialogPopup
@@ -540,7 +542,11 @@ function CommandPaletteDialog(props: {
             ? "Search project contents"
             : "Command palette"
       }
-      className={cn("overflow-hidden p-0", props.mode === "content" && "h-105")}
+      className={cn(
+        "overflow-hidden p-0",
+        props.mode === "content" && "h-105",
+        props.openIntent?.kind === "new-thread-in" && "w-[min(42rem,calc(100vw-2rem))] max-w-none",
+      )}
       data-command-palette="true"
       data-palette-mode={props.mode}
       data-testid="command-palette"
@@ -665,6 +671,27 @@ function OpenCommandPaletteDialog(props: {
     () =>
       new Map(
         environments.map((environment) => [environment.environmentId, environment.label] as const),
+      ),
+    [environments],
+  );
+  const projectEnvironmentLocationById = useMemo(
+    () =>
+      new Map(
+        environments.map((environment) => {
+          const isPrimary = environment.entry.target._tag === "PrimaryConnectionTarget";
+          const isLocal = isPrimary || isDesktopLocalConnectionTarget(environment.entry.target);
+          return [
+            environment.environmentId,
+            {
+              kind: isLocal ? "local" : "remote",
+              label: isPrimary
+                ? "Local"
+                : isLocal
+                  ? `${environment.label} (Local)`
+                  : environment.label,
+            },
+          ] as const;
+        }),
       ),
     [environments],
   );
@@ -1031,14 +1058,17 @@ function OpenCommandPaletteDialog(props: {
               : []),
           ];
         },
-        description: (project) => {
+        renderDescription: (project) => {
           const session = judeSessionByEnvironmentId.get(project.environmentId);
+          const branch = session ? judeSessionBranchName(session) : null;
           if (!session) return project.workspaceRoot;
           const owner = judeSessionOwnerLabel(session);
-          if (!owner) return undefined;
-          return isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
-            ? `Mine · ${owner}`
-            : `By ${owner}`;
+          const ownerLabel = owner
+            ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+              ? `Mine · ${owner}`
+              : `By ${owner}`
+            : null;
+          return [branch, ownerLabel].filter(Boolean).join(" · ") || project.workspaceRoot;
         },
         icon: projectFavicon,
         runProject: openProjectFromSearch,
@@ -1061,26 +1091,55 @@ function OpenCommandPaletteDialog(props: {
           searchTerms: (project) => {
             const group = projectGroupByTargetKey.get(`${project.environmentId}:${project.id}`);
             const session = judeSessionByEnvironmentId.get(project.environmentId);
+            const location = projectEnvironmentLocationById.get(project.environmentId);
             return [
               ...(group?.memberProjects.flatMap((member) => [member.title, member.workspaceRoot]) ??
                 []),
+              ...(location ? [location.label] : []),
               ...(session?.createdBy
                 ? [session.createdBy.login, session.createdBy.name, session.prompt]
                 : []),
             ];
           },
-          description: (project) => {
+          renderDescription: (project) => {
+            const location = projectEnvironmentLocationById.get(project.environmentId) ?? {
+              kind: "remote",
+              label: "Remote",
+            };
             const session = judeSessionByEnvironmentId.get(project.environmentId);
-            if (!session) return project.workspaceRoot;
-            const owner = judeSessionOwnerLabel(session);
-            if (!owner) return undefined;
-            return isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
-              ? `Mine · ${owner}`
-              : `By ${owner}`;
+            const branch = session ? judeSessionBranchName(session) : null;
+            const owner = session ? judeSessionOwnerLabel(session) : null;
+            const ownerLabel =
+              owner === null
+                ? null
+                : isJudeSessionOwnedByCurrentUser(session!, judeCurrentUser)
+                  ? `Mine · ${owner}`
+                  : `By ${owner}`;
+            return (
+              <span className="flex min-w-0 items-center gap-1">
+                <span className="inline-flex min-w-0 items-center gap-1">
+                  {location.kind === "remote" ? (
+                    <ServerIcon aria-hidden className={COMMAND_PALETTE_META_ICON_CLASS} />
+                  ) : null}
+                  <span className="truncate">{branch ?? location.label}</span>
+                </span>
+                <CommandPaletteMetaDot />
+                <span className="truncate">{ownerLabel ?? project.workspaceRoot}</span>
+                {ownerLabel ? (
+                  <>
+                    <CommandPaletteMetaDot />
+                    <span className="truncate">{project.workspaceRoot}</span>
+                  </>
+                ) : null}
+              </span>
+            );
           },
           icon: projectFavicon,
           runProject: async (project) => {
             const group = projectGroupByTargetKey.get(`${project.environmentId}:${project.id}`);
+            if (group) {
+              selectSidebarProjectScope(group.projectKey);
+            }
             const contextualRefBelongsToGroup =
               contextualProjectRef !== null &&
               group?.memberProjectRefs.some(
@@ -1102,9 +1161,96 @@ function OpenCommandPaletteDialog(props: {
       judeCurrentUser,
       judeSessionByEnvironmentId,
       pickerProjects,
+      projectEnvironmentLocationById,
       projectGroupByTargetKey,
     ],
   );
+
+  const projectThreadGroups = useMemo(() => {
+    const currentPrefix =
+      currentProjectEnvironmentId && currentProjectId
+        ? `new-thread-in:${currentProjectEnvironmentId}:${currentProjectId}`
+        : null;
+    const orderedItems = currentPrefix
+      ? [
+          ...projectThreadItems.filter((item) => item.value === currentPrefix),
+          ...projectThreadItems.filter((item) => item.value !== currentPrefix),
+        ]
+      : projectThreadItems;
+
+    if (!PRODUCT_CAPABILITIES.managedProjects) {
+      return [{ value: "projects", label: "Projects", items: orderedItems }];
+    }
+
+    const projectByItemValue = new Map<string, (typeof pickerProjects)[number]>(
+      pickerProjects.map(
+        (project) => [`new-thread-in:${project.environmentId}:${project.id}`, project] as const,
+      ),
+    );
+    const mine = [] as typeof orderedItems;
+    const other = [] as typeof orderedItems;
+    for (const item of orderedItems) {
+      const project = projectByItemValue.get(item.value);
+      if (!project) continue;
+      const session = judeSessionByEnvironmentId.get(project.environmentId);
+      if (session && isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)) {
+        mine.push(item);
+      } else {
+        other.push(item);
+      }
+    }
+
+    const connectedSessionIds = new Set(
+      [...judeSessionByEnvironmentId.values()].map((session) => session.id),
+    );
+    const sharedEnvironmentItems: CommandPaletteActionItem[] = judeSessions
+      .filter(
+        (session) =>
+          !isJudeSessionOwnedByCurrentUser(session, judeCurrentUser) &&
+          !connectedSessionIds.has(session.id) &&
+          session.urls.t3.trim().length > 0 &&
+          session.status !== "deleting",
+      )
+      .map((session) => {
+        const branch = judeSessionBranchName(session);
+        const owner = judeSessionOwnerLabel(session);
+        return {
+          kind: "action" as const,
+          value: `connect-jude-environment:${session.id}`,
+          searchTerms: [session.name, session.prompt, session.project, branch, owner].filter(
+            (term): term is string => Boolean(term),
+          ),
+          title: `Connect to ${judeSessionProjectPickerName(session)}`,
+          description: [branch, owner ? `By ${owner}` : null].filter(Boolean).join(" · "),
+          icon: <ServerIcon className={ITEM_ICON_CLASS} />,
+          run: async () => {
+            requestJudeEnvironmentConnection(session.id);
+          },
+        };
+      });
+
+    return [
+      ...(mine.length > 0 ? [{ value: "my-projects", label: "Mine", items: mine }] : []),
+      ...(other.length > 0 ? [{ value: "other-projects", label: "Other", items: other }] : []),
+      ...(sharedEnvironmentItems.length > 0
+        ? [
+            {
+              value: "other-environments",
+              label: "Other environments",
+              items: sharedEnvironmentItems,
+            },
+          ]
+        : []),
+    ];
+  }, [
+    currentProjectEnvironmentId,
+    currentProjectId,
+    judeCurrentUser,
+    judeSessions,
+    judeSessionByEnvironmentId,
+    pickerProjects,
+    projectThreadItems,
+  ]);
 
   const allThreadItems = useMemo(
     () =>
@@ -1473,7 +1619,7 @@ function OpenCommandPaletteDialog(props: {
   }, [clearOpenIntent, openAddProjectFlow, openIntent]);
 
   useLayoutEffect(() => {
-    if (openIntent?.kind !== "new-thread-in" || projectThreadItems.length === 0) {
+    if (openIntent?.kind !== "new-thread-in" || projectThreadGroups.length === 0) {
       return;
     }
     clearOpenIntent();
@@ -1481,35 +1627,14 @@ function OpenCommandPaletteDialog(props: {
     setAddProjectCloneFlow(null);
     setViewStack([]);
     setQuery("");
-    const currentPrefix =
-      currentProjectEnvironmentId && currentProjectId
-        ? `new-thread-in:${currentProjectEnvironmentId}:${currentProjectId}`
-        : null;
-    const prioritized = currentPrefix
-      ? [
-          ...projectThreadItems.filter((item) => item.value === currentPrefix),
-          ...projectThreadItems.filter((item) => item.value !== currentPrefix),
-        ]
-      : projectThreadItems;
     pushPaletteView({
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [
-        {
-          value: "projects",
-          label: "Projects",
-          items: enumerateCommandPaletteItems(prioritized),
-        },
-      ],
+      groups: projectThreadGroups.map((group) => ({
+        ...group,
+        items: enumerateCommandPaletteItems(group.items),
+      })),
     });
-  }, [
-    clearOpenIntent,
-    browseNavigation,
-    currentProjectEnvironmentId,
-    currentProjectId,
-    openIntent,
-    projectThreadItems,
-    pushPaletteView,
-  ]);
+  }, [clearOpenIntent, browseNavigation, openIntent, projectThreadGroups, pushPaletteView]);
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
 
@@ -1548,7 +1673,7 @@ function OpenCommandPaletteDialog(props: {
       title: "New thread in...",
       icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: "projects", label: "Projects", items: projectThreadItems }],
+      groups: projectThreadGroups,
     });
   }
 

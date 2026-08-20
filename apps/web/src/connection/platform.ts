@@ -61,11 +61,17 @@ import {
 import { connectionStorageLayer } from "./storage";
 import { PRODUCT_PROFILE } from "../branding";
 import {
+  getJudeCurrentUserSnapshot,
   issueJudeT3Pairing,
+  isJudeEnvironmentConnectionRequested,
+  isJudeSessionOwnedByCurrentUser,
   judeSessionDisplayName,
   listJudeSessions,
+  listJudeT3Environments,
   subscribeToJudeEnvironmentRefresh,
   type JudeSession,
+  type JudeT3Environment,
+  type JudeT3Pairing,
 } from "./jude";
 
 let nextObservedRpcRequestId = 0;
@@ -368,8 +374,8 @@ const loadSecondaryConnectionRegistration = Effect.fn(
 
 const loadJudeConnectionRegistration = Effect.fn(
   "web.connectionPlatform.loadJudeConnectionRegistration",
-)(function* (session: JudeSession) {
-  const pairing = yield* issueJudeT3Pairing(session.id);
+)(function* (session: JudeSession, providedPairing?: JudeT3Pairing) {
+  const pairing = providedPairing ?? (yield* issueJudeT3Pairing(session.id));
   const pairingTarget = yield* Effect.try({
     try: () => resolveRemotePairingTarget({ pairingUrl: pairing.pairingUrl }),
     catch: (cause) =>
@@ -378,16 +384,21 @@ const loadJudeConnectionRegistration = Effect.fn(
         detail: `Jude returned an invalid T3 pairing URL for ${session.name}: ${String(cause)}`,
       }),
   });
-  const descriptor = yield* fetchRemoteEnvironmentDescriptor({
-    httpBaseUrl: pairingTarget.httpBaseUrl,
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  const [descriptor, access] = yield* Effect.all(
+    [
+      fetchRemoteEnvironmentDescriptor({ httpBaseUrl: pairingTarget.httpBaseUrl }).pipe(
+        Effect.mapError(mapRemoteEnvironmentError),
+      ),
+      bootstrapRemoteBearerSession({
+        httpBaseUrl: pairingTarget.httpBaseUrl,
+        credential: pairingTarget.credential,
+        scopes: AuthStandardClientScopes,
+        clientMetadata: clientMetadata(),
+      }).pipe(Effect.mapError(mapRemoteEnvironmentError)),
+    ],
+    { concurrency: "unbounded" },
+  );
   const issuedAtEpochMs = yield* Clock.currentTimeMillis;
-  const access = yield* bootstrapRemoteBearerSession({
-    httpBaseUrl: pairingTarget.httpBaseUrl,
-    credential: pairingTarget.credential,
-    scopes: AuthStandardClientScopes,
-    clientMetadata: clientMetadata(),
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
   const connectionId = `jude:${session.id}`;
   const label = judeSessionDisplayName(session) || descriptor.label;
 
@@ -417,6 +428,7 @@ const loadJudeConnectionRegistration = Effect.fn(
 // signature of their endpoint + token until bearer credentials approach expiry.
 const PLATFORM_POLL_INTERVAL = "3 seconds";
 const SECONDARY_BEARER_REFRESH_SKEW_MS = 5_000;
+const JUDE_BOOTSTRAP_CONCURRENCY = 6;
 
 export function secondaryBearerExpiresAtEpochMs(
   issuedAtEpochMs: number,
@@ -441,6 +453,19 @@ interface CachedPlatformRegistration {
   readonly registration: PlatformConnectionRegistration;
   readonly expiresAtEpochMs?: number;
   readonly refreshAtEpochMs?: number;
+}
+
+function retainedCachedPlatformRegistrations(
+  previous: ReadonlyMap<string, CachedPlatformRegistration>,
+  nowEpochMs: number,
+): PlatformConnectionRegistration[] {
+  const registrations: PlatformConnectionRegistration[] = [];
+  for (const cached of previous.values()) {
+    if (cached.expiresAtEpochMs === undefined || nowEpochMs < cached.expiresAtEpochMs) {
+      registrations.push(cached.registration);
+    }
+  }
+  return registrations;
 }
 
 export type PrimaryEnvironmentTargetRead =
@@ -497,6 +522,27 @@ export function canConnectToJudeT3Session(session: JudeSession): boolean {
   return session.status !== "deleting" && session.urls.t3.trim().length > 0;
 }
 
+export function readyJudeT3SessionsToBootstrap(
+  environments: ReadonlyArray<JudeT3Environment>,
+): Array<{ readonly session: JudeSession }> {
+  return environments.flatMap((environment) =>
+    environment.t3.state === "ready" && canConnectToJudeT3Session(environment)
+      ? [{ session: environment }]
+      : [],
+  );
+}
+
+export function judeT3SessionsToBootstrap(
+  environments: ReadonlyArray<JudeT3Environment>,
+  currentUser = getJudeCurrentUserSnapshot(),
+): Array<{ readonly session: JudeSession }> {
+  return readyJudeT3SessionsToBootstrap(environments).filter(
+    ({ session }) =>
+      isJudeSessionOwnedByCurrentUser(session, currentUser) ||
+      isJudeEnvironmentConnectionRequested(session.id),
+  );
+}
+
 export function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
@@ -523,6 +569,9 @@ const platformConnectionSourceLayer = Layer.effect(
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
 
     if (PRODUCT_PROFILE.id === "p3") {
+      const judeSnapshotEtagRef = yield* Ref.make<string | null>(null);
+      const judeSnapshotRetryAfterMsRef = yield* Ref.make(5_000);
+      const judeSnapshotEnvironmentsRef = yield* Ref.make<ReadonlyArray<JudeT3Environment>>([]);
       const manualRefreshes = Stream.callback<void>((queue) =>
         Effect.acquireRelease(
           Effect.sync(() =>
@@ -534,30 +583,71 @@ const platformConnectionSourceLayer = Layer.effect(
       const buildJudePlatformRegistrations = Effect.gen(function* () {
         const previous = yield* Ref.get(cacheRef);
         const nowEpochMs = yield* Clock.currentTimeMillis;
-        const sessionsResult = yield* listJudeSessions().pipe(Effect.result);
+        const snapshotResult = yield* listJudeT3Environments(
+          yield* Ref.get(judeSnapshotEtagRef),
+        ).pipe(Effect.result);
 
-        if (sessionsResult._tag === "Failure") {
+        if (snapshotResult._tag === "Failure") {
           yield* Effect.logWarning(
-            `Could not refresh Jude environments: ${sessionsResult.failure.message}`,
+            `Could not refresh Jude environments: ${snapshotResult.failure.message}`,
           );
-          return [...previous.values()]
-            .filter(
-              (cached) =>
-                cached.expiresAtEpochMs === undefined || nowEpochMs < cached.expiresAtEpochMs,
-            )
-            .map((cached) => cached.registration);
+          return retainedCachedPlatformRegistrations(previous, nowEpochMs);
+        }
+
+        let connectableSessions: Array<{
+          readonly session: JudeSession;
+          readonly pairing?: JudeT3Pairing;
+        }>;
+        if (snapshotResult.success._tag === "NotModified") {
+          // An explicit shared-environment opt-in does not change Jude's
+          // aggregate revision. Reuse the retained snapshot to connect it.
+          connectableSessions = judeT3SessionsToBootstrap(
+            yield* Ref.get(judeSnapshotEnvironmentsRef),
+          );
+        } else if (snapshotResult.success._tag === "RouteUnavailable") {
+          const legacySessionsResult = yield* listJudeSessions().pipe(Effect.result);
+          if (legacySessionsResult._tag === "Failure") {
+            yield* Effect.logWarning(
+              `Could not refresh Jude environments through the legacy endpoint: ${legacySessionsResult.failure.message}`,
+            );
+            return retainedCachedPlatformRegistrations(previous, nowEpochMs);
+          }
+          connectableSessions = [];
+          for (const session of legacySessionsResult.success) {
+            if (
+              canConnectToJudeT3Session(session) &&
+              (isJudeSessionOwnedByCurrentUser(session, getJudeCurrentUserSnapshot()) ||
+                isJudeEnvironmentConnectionRequested(session.id))
+            ) {
+              connectableSessions.push({ session });
+            }
+          }
+        } else {
+          const snapshot = snapshotResult.success;
+          yield* Ref.set(judeSnapshotEtagRef, snapshot.etag ?? snapshot.revision);
+          yield* Ref.set(judeSnapshotEnvironmentsRef, snapshot.environments);
+          const environmentRetryAfterMs = Math.max(
+            0,
+            ...snapshot.environments.map((environment) => environment.t3.retryAfterMs ?? 0),
+          );
+          yield* Ref.set(
+            judeSnapshotRetryAfterMsRef,
+            Math.max(1_000, snapshot.retryAfterMs ?? 5_000, environmentRetryAfterMs),
+          );
+          // Snapshot readiness is credential-free. Request a short-lived,
+          // single-use pairing artifact only for ready environments below.
+          connectableSessions = judeT3SessionsToBootstrap(snapshot.environments);
         }
 
         const next = new Map<string, CachedPlatformRegistration>();
         const registrations: PlatformConnectionRegistration[] = [];
-        const connectableSessions = sessionsResult.success.filter(canConnectToJudeT3Session);
 
         yield* Effect.forEach(
           connectableSessions,
-          (session) =>
+          ({ session, pairing }) =>
             Effect.gen(function* () {
               const cacheKey = `jude:${session.id}`;
-              const signature = `${session.id}|${session.name}|${session.urls.t3}`;
+              const signature = `${session.id}|${session.name}|${session.urls.t3}|${pairing?.pairingUrl ?? ""}`;
               const cached = previous.get(cacheKey);
               if (
                 cached !== undefined &&
@@ -568,7 +658,7 @@ const platformConnectionSourceLayer = Layer.effect(
                 return;
               }
 
-              const built = yield* loadJudeConnectionRegistration(session).pipe(
+              const built = yield* loadJudeConnectionRegistration(session, pairing).pipe(
                 Effect.tapError((error) =>
                   Effect.logWarning("Could not connect a Jude environment.", {
                     sessionId: session.id,
@@ -593,16 +683,30 @@ const platformConnectionSourceLayer = Layer.effect(
                 registrations.push(cached.registration);
               }
             }),
-          { concurrency: 4, discard: true },
+          { concurrency: JUDE_BOOTSTRAP_CONCURRENCY, discard: true },
         );
 
         yield* Ref.set(cacheRef, next);
         return registrations;
       }).pipe(Effect.provide(FetchHttpClient.layer));
 
+      let hasPolledJude = false;
+      const scheduledJudeRegistrations = Stream.fromEffectRepeat(
+        Effect.suspend(() =>
+          Effect.gen(function* () {
+            if (hasPolledJude) {
+              yield* Effect.sleep(yield* Ref.get(judeSnapshotRetryAfterMsRef));
+            }
+            hasPolledJude = true;
+            return yield* buildJudePlatformRegistrations;
+          }),
+        ),
+      );
+
       return PlatformConnectionSource.of({
-        registrations: Stream.merge(Stream.tick(PLATFORM_POLL_INTERVAL), manualRefreshes).pipe(
-          Stream.mapEffect(() => buildJudePlatformRegistrations),
+        registrations: Stream.merge(
+          scheduledJudeRegistrations,
+          manualRefreshes.pipe(Stream.mapEffect(() => buildJudePlatformRegistrations)),
         ),
       });
     }

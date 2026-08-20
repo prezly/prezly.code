@@ -11,9 +11,12 @@ import {
   formatJudeAppName,
   getCreatedJudeSessionIdsSnapshot,
   getJudeCurrentUserSnapshot,
+  getJudeSessionDiscoveryStateSnapshot,
   getJudeSessionsSnapshot,
+  isJudeEnvironmentConnectionRequested,
   isJudeSessionOwnedByCurrentUser,
   issueJudeT3Pairing,
+  judeSessionBranchName,
   judeSessionDisplayName,
   judeSessionNameForConnection,
   judeSessionOwnerLabel,
@@ -21,9 +24,11 @@ import {
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
+  listJudeT3Environments,
   listJudeSessions,
   provisionJudeProject,
   requestJudeEnvironmentRefresh,
+  requestJudeEnvironmentConnection,
   subscribeToJudeEnvironmentRefresh,
 } from "./jude.ts";
 
@@ -59,6 +64,21 @@ describe("Jude discovery", () => {
     expect(judeSessionProjectPickerName(sessions[0]!)).toBe("Admin v2 · Fix search");
     expect(judeSessionNameForConnection("jude:admin-fix-search", sessions)).toBe("Fix search");
     expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
+  });
+
+  it("prefers Jude branch metadata over the environment name", () => {
+    expect(
+      judeSessionBranchName({
+        id: "website-fix-search",
+        name: "website-fix-search",
+        prompt: "Fix search",
+        project: "website",
+        baseRef: "main",
+        branch: "feature/fix-search",
+        status: "ready",
+        urls: { t3: "https://website-fix-search.t3.jude.prezly.dev" },
+      }),
+    ).toBe("feature/fix-search");
   });
 
   it("formats Jude owners and identifies the current user's sessions", () => {
@@ -152,6 +172,119 @@ describe("Jude discovery", () => {
       ]);
       expect(getCreatedJudeSessionIdsSnapshot()).toBe(createdSessionIdsBeforeDiscovery);
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
+    }),
+  );
+
+  it.effect("uses Jude's aggregate T3 environment snapshot and ETag", () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(
+          Response.json(
+            {
+              revision: "42",
+              retryAfterMs: 7_500,
+              environments: [
+                {
+                  id: "website-fix-search",
+                  name: "website-fix-search",
+                  prompt: "Fix search",
+                  project: "website",
+                  baseRef: "main",
+                  status: "ready",
+                  urls: { t3: "https://website-fix-search.t3.jude.prezly.dev" },
+                  t3: {
+                    state: "ready",
+                  },
+                },
+              ],
+            },
+            { headers: { ETag: '"42"' } },
+          ),
+        )
+        .mockResolvedValueOnce(new Response(null, { status: 304 }));
+
+      const updated = yield* listJudeT3Environments(null, fetch);
+      expect(updated).toMatchObject({
+        _tag: "Updated",
+        revision: "42",
+        etag: '"42"',
+        retryAfterMs: 7_500,
+      });
+      const unchanged = yield* listJudeT3Environments('"42"', fetch);
+      expect(unchanged).toEqual({ _tag: "NotModified" });
+      expect(fetch).toHaveBeenNthCalledWith(1, "/_p3/jude/api/t3/environments", {
+        method: "GET",
+      });
+      expect(fetch).toHaveBeenNthCalledWith(2, "/_p3/jude/api/t3/environments", {
+        method: "GET",
+        headers: { "If-None-Match": '"42"' },
+      });
+    }),
+  );
+
+  it.effect("only uses the legacy endpoint when the aggregate route is unavailable", () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 404 }));
+      expect(yield* listJudeT3Environments(null, fetch)).toEqual({ _tag: "RouteUnavailable" });
+    }),
+  );
+
+  it.effect("accepts credential-free ready environments", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json({
+          revision: "43",
+          environments: [
+            {
+              id: "website-ready",
+              name: "website-ready",
+              prompt: "Fix search",
+              project: "website",
+              status: "ready",
+              urls: { t3: "https://website-ready.t3.jude.prezly.dev" },
+              t3: { state: "ready" },
+            },
+          ],
+        }),
+      );
+
+      const snapshot = yield* listJudeT3Environments(null, fetch);
+      expect(snapshot).toMatchObject({ _tag: "Updated", revision: "43" });
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
+    }),
+  );
+
+  it.effect("forgets opted-in environments that Jude no longer returns", () =>
+    Effect.gen(function* () {
+      const removedSessionId = "removed-shared-environment";
+      requestJudeEnvironmentConnection(removedSessionId);
+      expect(isJudeEnvironmentConnectionRequested(removedSessionId)).toBe(true);
+
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(Response.json({ revision: "44", environments: [] }));
+      yield* listJudeT3Environments(null, fetch);
+
+      expect(isJudeEnvironmentConnectionRequested(removedSessionId)).toBe(false);
+    }),
+  );
+
+  it.effect("keeps Jude discovery ready after a later refresh failure", () =>
+    Effect.gen(function* () {
+      const available = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(Response.json({ sessions: [] }));
+      yield* listJudeSessions(available);
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
+
+      const unavailable = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 503 }));
+      yield* Effect.exit(listJudeSessions(unavailable));
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
     }),
   );
 

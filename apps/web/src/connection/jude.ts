@@ -27,6 +27,9 @@ const JudeSessionSchema = Schema.Struct({
   visitUrl: Schema.optional(Schema.String),
   prompt: Schema.String,
   project: Schema.String,
+  // Jude has used both names while rolling out branch metadata.
+  baseRef: Schema.optional(Schema.String),
+  branch: Schema.optional(Schema.String),
   createdBy: Schema.optional(JudeCreatorSchema),
   status: JudeSessionStatus,
   urls: Schema.Struct({
@@ -44,6 +47,32 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
+const JudeT3EnvironmentState = Schema.Literals(["ready", "starting", "unavailable"]);
+
+const JudeT3EnvironmentSchema = Schema.Struct({
+  id: Schema.String,
+  name: Schema.String,
+  visitUrl: Schema.optional(Schema.String),
+  prompt: Schema.String,
+  project: Schema.String,
+  baseRef: Schema.optional(Schema.String),
+  branch: Schema.optional(Schema.String),
+  createdBy: Schema.optional(JudeCreatorSchema),
+  status: JudeSessionStatus,
+  urls: Schema.Struct({ t3: Schema.String }),
+  t3: Schema.Struct({
+    state: JudeT3EnvironmentState,
+    retryAfterMs: Schema.optional(Schema.Number),
+    reason: Schema.optional(Schema.Literals(["service-not-ready", "pairing-unavailable"])),
+  }),
+});
+
+const JudeT3EnvironmentsResponseSchema = Schema.Struct({
+  revision: Schema.String,
+  retryAfterMs: Schema.optional(Schema.Number),
+  environments: Schema.Array(JudeT3EnvironmentSchema),
+});
+
 const JudeModelSchema = Schema.Struct({
   id: Schema.String,
   name: Schema.String,
@@ -57,6 +86,9 @@ const JudeModelsResponseSchema = Schema.Struct({
 const decodeJudeSessionsResponse = Schema.decodeUnknownEffect(JudeSessionsResponseSchema);
 const decodeJudeCurrentUser = Schema.decodeUnknownEffect(JudeCreatorSchema);
 const decodeJudeT3Pairing = Schema.decodeUnknownEffect(JudeT3PairingSchema);
+const decodeJudeT3EnvironmentsResponse = Schema.decodeUnknownEffect(
+  JudeT3EnvironmentsResponseSchema,
+);
 const decodeJudeSession = Schema.decodeUnknownEffect(JudeSessionSchema);
 const decodeJudeModelsResponse = Schema.decodeUnknownEffect(JudeModelsResponseSchema);
 const encodeUnknownJson = Schema.encodeUnknownSync(Schema.fromJsonString(Schema.Unknown));
@@ -65,11 +97,28 @@ let judeAuthenticationPromise: Promise<void> | null = null;
 
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeCurrentUser = typeof JudeCreatorSchema.Type;
+export type JudeSessionDiscoveryState = "pending" | "ready" | "error";
 
 export function isJudeSessionOperational(session: JudeSession): boolean {
   return session.status === "ready" || session.status === "degraded";
 }
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
+export type JudeT3Environment = typeof JudeT3EnvironmentSchema.Type;
+export type JudeT3EnvironmentsSnapshot =
+  | {
+      readonly _tag: "NotModified";
+    }
+  | {
+      readonly _tag: "RouteUnavailable";
+    }
+  | {
+      readonly _tag: "Updated";
+      readonly revision: string;
+      readonly etag: string | null;
+      readonly retryAfterMs: number | undefined;
+      readonly environments: ReadonlyArray<JudeT3Environment>;
+    };
+
 export type JudeModel = typeof JudeModelSchema.Type;
 
 export interface CreateJudeSessionInput {
@@ -83,11 +132,54 @@ export interface CreateJudeSessionInput {
 let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
 let judeSessionsSignature = "[]";
 const judeSessionsListeners = new Set<() => void>();
+let judeSessionDiscoveryStateSnapshot: JudeSessionDiscoveryState = "pending";
+const judeSessionDiscoveryStateListeners = new Set<() => void>();
 let judeCurrentUserSnapshot: JudeCurrentUser | null = null;
 const judeCurrentUserListeners = new Set<() => void>();
 let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
 const createdJudeSessionIdsListeners = new Set<() => void>();
 const judeEnvironmentRefreshListeners = new Set<() => void>();
+const JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY = "p3code:jude:connected-environment-ids:v1";
+
+function readRequestedJudeEnvironmentConnectionIds(): ReadonlyArray<string> {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+const requestedJudeEnvironmentConnectionIds = new Set(readRequestedJudeEnvironmentConnectionIds());
+
+function persistRequestedJudeEnvironmentConnectionIds(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY,
+      JSON.stringify([...requestedJudeEnvironmentConnectionIds]),
+    );
+  } catch {
+    // Connection opt-ins are still useful for this app session if storage is unavailable.
+  }
+}
+
+function pruneRequestedJudeEnvironmentConnectionIds(sessions: ReadonlyArray<JudeSession>): void {
+  const availableIds = new Set(sessions.map((session) => session.id));
+  let changed = false;
+  for (const sessionId of requestedJudeEnvironmentConnectionIds) {
+    if (!availableIds.has(sessionId)) {
+      requestedJudeEnvironmentConnectionIds.delete(sessionId);
+      changed = true;
+    }
+  }
+  if (changed) persistRequestedJudeEnvironmentConnectionIds();
+}
 
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
 
@@ -109,6 +201,10 @@ export function judeSessionDisplayName(session: JudeSession): string {
 
 export function judeSessionProjectPickerName(session: JudeSession): string {
   return `${formatJudeAppName(session.project)} · ${judeSessionDisplayName(session)}`;
+}
+
+export function judeSessionBranchName(session: JudeSession): string | null {
+  return session.branch?.trim() || session.baseRef?.trim() || null;
 }
 
 export function judeSessionOwnerLabel(session: JudeSession): string | null {
@@ -157,6 +253,15 @@ export function subscribeToJudeSessions(listener: () => void): () => void {
   return () => judeSessionsListeners.delete(listener);
 }
 
+export function getJudeSessionDiscoveryStateSnapshot(): JudeSessionDiscoveryState {
+  return judeSessionDiscoveryStateSnapshot;
+}
+
+export function subscribeToJudeSessionDiscoveryState(listener: () => void): () => void {
+  judeSessionDiscoveryStateListeners.add(listener);
+  return () => judeSessionDiscoveryStateListeners.delete(listener);
+}
+
 export function getJudeCurrentUserSnapshot(): JudeCurrentUser | null {
   return judeCurrentUserSnapshot;
 }
@@ -191,12 +296,33 @@ export function subscribeToJudeEnvironmentRefresh(listener: () => void): () => v
   return () => judeEnvironmentRefreshListeners.delete(listener);
 }
 
+/**
+ * Requests a connection to a shared Jude environment. Connections are kept for
+ * this renderer session so selecting an environment does not repeatedly issue
+ * pairing requests on every aggregate refresh.
+ */
+export function requestJudeEnvironmentConnection(sessionId: string): void {
+  requestedJudeEnvironmentConnectionIds.add(sessionId);
+  persistRequestedJudeEnvironmentConnectionIds();
+  requestJudeEnvironmentRefresh();
+}
+
+export function isJudeEnvironmentConnectionRequested(sessionId: string): boolean {
+  return requestedJudeEnvironmentConnectionIds.has(sessionId);
+}
+
 function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
   const signature = JSON.stringify(sessions);
   if (signature === judeSessionsSignature) return;
   judeSessionsSignature = signature;
   judeSessionsSnapshot = sessions;
   for (const listener of judeSessionsListeners) listener();
+}
+
+function publishJudeSessionDiscoveryState(state: JudeSessionDiscoveryState): void {
+  if (state === judeSessionDiscoveryStateSnapshot) return;
+  judeSessionDiscoveryStateSnapshot = state;
+  for (const listener of judeSessionDiscoveryStateListeners) listener();
 }
 
 function publishJudeCurrentUser(user: JudeCurrentUser): void {
@@ -277,7 +403,7 @@ const requestJson = Effect.fn("web.jude.requestJson")(function* (input: {
     return yield* discoveryError(input.operation, `HTTP ${response.status}`);
   }
   return yield* Effect.tryPromise({
-    try: () => response.json(),
+    try: async (): Promise<unknown> => response.json(),
     catch: (cause) => discoveryError(input.operation, cause),
   });
 });
@@ -303,17 +429,80 @@ export const ensureJudeAuthenticated = Effect.fn("web.jude.ensureAuthenticated")
 export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
   fetch: typeof globalThis.fetch = globalThis.fetch,
 ) {
-  const body = yield* requestJson({
-    fetch,
-    operation: "session discovery",
-    path: "/api/sessions",
-    method: "GET",
-  });
-  const response = yield* decodeJudeSessionsResponse(body).pipe(
-    Effect.mapError((cause) => discoveryError("session discovery", cause)),
+  return yield* Effect.gen(function* () {
+    const body = yield* requestJson({
+      fetch,
+      operation: "session discovery",
+      path: "/api/sessions",
+      method: "GET",
+    });
+    const response = yield* decodeJudeSessionsResponse(body).pipe(
+      Effect.mapError((cause) => discoveryError("session discovery", cause)),
+    );
+    pruneRequestedJudeEnvironmentConnectionIds(response.sessions);
+    publishJudeSessions(response.sessions);
+    publishJudeSessionDiscoveryState("ready");
+    return response.sessions;
+  }).pipe(
+    Effect.tapError(() =>
+      Effect.sync(() => {
+        // A refresh failure must not hide controls backed by the last known-good session list.
+        if (judeSessionDiscoveryStateSnapshot !== "ready") {
+          publishJudeSessionDiscoveryState("error");
+        }
+      }),
+    ),
   );
-  publishJudeSessions(response.sessions);
-  return response.sessions;
+});
+
+export const listJudeT3Environments = Effect.fn("web.jude.listT3Environments")(function* (
+  etag: string | null,
+  fetch: typeof globalThis.fetch = globalThis.fetch,
+) {
+  const fetchSnapshot = () =>
+    fetch.call(globalThis, `${JUDE_DESKTOP_PROXY_PATH}/api/t3/environments`, {
+      method: "GET",
+      ...(etag ? { headers: { "If-None-Match": etag } } : {}),
+    });
+  let response = yield* Effect.tryPromise({
+    try: fetchSnapshot,
+    catch: (cause) => discoveryError("T3 environment discovery", cause),
+  });
+  if (response.status === 401 && window.desktopBridge?.authenticateJude) {
+    judeAuthenticationPromise ??= window.desktopBridge.authenticateJude().finally(() => {
+      judeAuthenticationPromise = null;
+    });
+    yield* Effect.tryPromise({
+      try: () => judeAuthenticationPromise!,
+      catch: (cause) => discoveryError("T3 environment discovery authentication", cause),
+    });
+    response = yield* Effect.tryPromise({
+      try: fetchSnapshot,
+      catch: (cause) => discoveryError("T3 environment discovery", cause),
+    });
+  }
+  if (response.status === 304) return { _tag: "NotModified" } as const;
+  if (response.status === 404) return { _tag: "RouteUnavailable" } as const;
+  if (!response.ok) {
+    return yield* discoveryError("T3 environment discovery", `HTTP ${response.status}`);
+  }
+  const body = yield* Effect.tryPromise({
+    try: async (): Promise<unknown> => response.json(),
+    catch: (cause) => discoveryError("T3 environment discovery", cause),
+  });
+  const rawSnapshot = yield* decodeJudeT3EnvironmentsResponse(body).pipe(
+    Effect.mapError((cause) => discoveryError("T3 environment discovery", cause)),
+  );
+  pruneRequestedJudeEnvironmentConnectionIds(rawSnapshot.environments);
+  publishJudeSessions(rawSnapshot.environments);
+  publishJudeSessionDiscoveryState("ready");
+  return {
+    _tag: "Updated",
+    revision: rawSnapshot.revision,
+    etag: response.headers.get("ETag"),
+    retryAfterMs: rawSnapshot.retryAfterMs,
+    environments: rawSnapshot.environments,
+  } as const;
 });
 
 export function refreshJudeEnvironments(): Promise<ReadonlyArray<JudeSession>> {

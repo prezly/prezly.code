@@ -11,8 +11,8 @@ Once Jude accepts the environment, Prezly.code closes the dialog and immediately
 in the left sidebar with its provisioning status. Only environments created in the running app get
 this temporary row; existing Jude environments remain in the project picker. The row becomes
 interactive as soon as the project connects and remains until the first user prompt is submitted.
-Project picker entries use the Jude prompt as the environment name and show who created the
-environment. Your environments are grouped under **My projects** and identified as **Mine**;
+Project picker entries use the Jude prompt as the environment name and show the branch followed by
+who created the environment. Your environments are grouped under **My projects** and identified as **Mine**;
 environments created by teammates appear under **Other projects**. The create-session project
 search shows the same ownership details instead of the internal `/source` path. Thread breadcrumbs
 use the environment name. If provisioning fails or takes longer than 15 minutes, the sidebar

@@ -21,6 +21,25 @@ describe("Codex App Server child process termination", () => {
     }),
   );
 
+  it.effect("includes the bounded stderr tail with a process exit", () =>
+    Effect.gen(function* () {
+      const error = yield* makeTerminationError(
+        {
+          pid: ChildProcessSpawner.ProcessId(53),
+          exitCode: Effect.succeed(ChildProcessSpawner.ExitCode(1)),
+        },
+        Effect.succeed("invalid config key: experimental_feature"),
+      );
+
+      assert.instanceOf(error, CodexError.CodexAppServerProcessExitedError);
+      assert.equal(error.stderrTail, "invalid config key: experimental_feature");
+      assert.equal(
+        error.message,
+        "Codex App Server process exited with code 1: invalid config key: experimental_feature",
+      );
+    }),
+  );
+
   it.effect("retains the process identifier and exact exit-status cause", () =>
     Effect.gen(function* () {
       const rootCause = new Error("private process diagnostics");

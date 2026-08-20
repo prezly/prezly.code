@@ -501,6 +501,25 @@ it.layer(Layer.mergeAll(NodeServices.layer, ServerSettingsModule.layerTest(), Te
         }),
       );
 
+      it.effect("includes Codex app-server stderr in provider probe failures", () =>
+        Effect.gen(function* () {
+          const status = yield* checkCodexProviderStatus(defaultCodexSettings, () =>
+            Effect.fail(
+              new CodexErrors.CodexAppServerProcessExitedError({
+                code: 1,
+                stderrTail: "invalid config key: experimental_feature",
+              }),
+            ),
+          );
+
+          assert.strictEqual(status.status, "error");
+          assert.strictEqual(
+            status.message,
+            "Codex app-server provider probe failed: Codex App Server process exited with code 1: invalid config key: experimental_feature.",
+          );
+        }),
+      );
+
       it.effect("closes the app-server probe scope when provider status times out", () =>
         Effect.gen(function* () {
           const killCalls = yield* Ref.make(0);
