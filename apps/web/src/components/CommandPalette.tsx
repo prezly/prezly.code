@@ -163,6 +163,7 @@ import type { Project } from "../types";
 import { PRODUCT_CAPABILITIES } from "../branding";
 import {
   isJudeSessionOwnedByCurrentUser,
+  judeSessionBranchName,
   judeSessionIdFromConnectionId,
   judeSessionOwnerLabel,
   judeSessionProjectPickerName,
@@ -1057,12 +1058,15 @@ function OpenCommandPaletteDialog(props: {
         },
         renderDescription: (project) => {
           const session = judeSessionByEnvironmentId.get(project.environmentId);
+          const branch = session ? judeSessionBranchName(session) : null;
           if (!session) return project.workspaceRoot;
           const owner = judeSessionOwnerLabel(session);
-          if (!owner) return undefined;
-          return isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
-            ? `Mine · ${owner}`
-            : `By ${owner}`;
+          const ownerLabel = owner
+            ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+              ? `Mine · ${owner}`
+              : `By ${owner}`
+            : null;
+          return [branch, ownerLabel].filter(Boolean).join(" · ") || project.workspaceRoot;
         },
         icon: projectFavicon,
         runProject: openProjectFromSearch,
@@ -1101,6 +1105,7 @@ function OpenCommandPaletteDialog(props: {
               label: "Remote",
             };
             const session = judeSessionByEnvironmentId.get(project.environmentId);
+            const branch = session ? judeSessionBranchName(session) : null;
             const owner = session ? judeSessionOwnerLabel(session) : null;
             const ownerLabel =
               owner === null
@@ -1114,7 +1119,7 @@ function OpenCommandPaletteDialog(props: {
                   {location.kind === "remote" ? (
                     <ServerIcon aria-hidden className={COMMAND_PALETTE_META_ICON_CLASS} />
                   ) : null}
-                  <span className="truncate">{location.label}</span>
+                  <span className="truncate">{branch ?? location.label}</span>
                 </span>
                 <CommandPaletteMetaDot />
                 <span className="truncate">{ownerLabel ?? project.workspaceRoot}</span>
