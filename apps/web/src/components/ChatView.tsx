@@ -4283,7 +4283,7 @@ function ChatViewContent(props: ChatViewProps) {
         ? null
         : { state: activeThreadPrState, updatedAt: activeThreadPrUpdatedAt },
     [activeThreadPrState, activeThreadPrUpdatedAt],
-   );
+  );
   const supportsSettlement = serverConfig?.environment.capabilities.threadSettlement === true;
   const supportsSnooze = serverConfig?.environment.capabilities.threadSnooze === true;
   const nowMinute = useNowMinute();
