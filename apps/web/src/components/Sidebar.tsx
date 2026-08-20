@@ -101,6 +101,7 @@ import { useThreadActions } from "../hooks/useThreadActions";
 import { useHandleNewThread } from "../hooks/useHandleNewThread";
 import { openCommandPalette } from "../commandPaletteBus";
 import { openCreateJudeProject } from "../judeProjectBus";
+import { onSidebarProjectScope } from "../sidebarProjectScopeBus";
 import { startNewThreadFromContext } from "../lib/chatThreadActions";
 import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import {
@@ -2025,6 +2026,7 @@ export default function Sidebar() {
   // Project scope: one menu above the list. Scoping filters the list without
   // making the header width depend on the number or length of project names.
   const [projectScopeKey, setProjectScopeKey] = useState<string | null>(null);
+  useEffect(() => onSidebarProjectScope(setProjectScopeKey), []);
   const scopedProjectGroup = useMemo(
     () =>
       projectScopeKey === null

@@ -155,6 +155,7 @@ import { ComposerHandleContext, useComposerHandleContext } from "../composerHand
 import type { ChatComposerHandle } from "./chat/ChatComposer";
 import { getProjectOrderKey, selectProjectGroupingSettings } from "../logicalProject";
 import { legacyProjectCwdPreferenceKey, useUiStateStore } from "../uiStateStore";
+import { selectSidebarProjectScope } from "../sidebarProjectScopeBus";
 import {
   buildSidebarProjectPickerEntries,
   buildSidebarProjectSnapshots,
@@ -1136,6 +1137,9 @@ function OpenCommandPaletteDialog(props: {
           icon: projectFavicon,
           runProject: async (project) => {
             const group = projectGroupByTargetKey.get(`${project.environmentId}:${project.id}`);
+            if (group) {
+              selectSidebarProjectScope(group.projectKey);
+            }
             const contextualRefBelongsToGroup =
               contextualProjectRef !== null &&
               group?.memberProjectRefs.some(
