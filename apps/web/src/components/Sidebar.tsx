@@ -3703,7 +3703,7 @@ export default function Sidebar() {
                       </span>
                       <ChevronDownIcon className="-mr-px size-4 shrink-0" />
                     </MenuTrigger>
-                    <MenuPopup align="start" className="w-(--anchor-width)">
+                    <MenuPopup align="start" className="w-[min(30rem,calc(100vw-1rem))]">
                       <MenuRadioGroup
                         value={projectScopeKey ?? "all"}
                         onValueChange={(value) =>
@@ -3730,9 +3730,6 @@ export default function Sidebar() {
                               const pickerDisplayName = projectPickerDisplayName(project);
                               const session = judeSessionByEnvironmentId.get(project.environmentId);
                               const ownerLabel = session ? judeSessionOwnerLabel(session) : null;
-                              const isMine = session
-                                ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
-                                : false;
                               return (
                                 <MenuRadioItem
                                   key={scopeKey}
@@ -3744,15 +3741,23 @@ export default function Sidebar() {
                                     environmentId={project.environmentId}
                                     cwd={project.workspaceRoot}
                                     faviconPath={project.faviconPath}
-                                    className="size-4 shrink-0"
+                                    className="-mx-0.5 size-4 shrink-0"
                                   />
                                   <span className="flex min-w-0 flex-1 flex-col">
                                     <span className="truncate text-sm">{pickerDisplayName}</span>
-                                    {ownerLabel ? (
-                                      <span className="truncate font-normal text-muted-foreground text-xs">
-                                        {isMine ? `Mine · ${ownerLabel}` : `By ${ownerLabel}`}
+                                    <span className="flex min-w-0 items-center gap-1 truncate font-normal text-muted-foreground text-xs">
+                                      <span className="truncate">
+                                        {session
+                                          ? judeSessionDisplayName(session)
+                                          : project.workspaceRoot}
                                       </span>
-                                    ) : null}
+                                      {ownerLabel ? (
+                                        <>
+                                          <span aria-hidden>·</span>
+                                          <span className="truncate">{ownerLabel}</span>
+                                        </>
+                                      ) : null}
+                                    </span>
                                   </span>
                                   {PRODUCT_CAPABILITIES.allowProjectManagement ? (
                                     <Button
