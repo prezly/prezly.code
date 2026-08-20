@@ -139,6 +139,7 @@ const judeCurrentUserListeners = new Set<() => void>();
 let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
 const createdJudeSessionIdsListeners = new Set<() => void>();
 const judeEnvironmentRefreshListeners = new Set<() => void>();
+const requestedJudeEnvironmentConnectionIds = new Set<string>();
 
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
 
@@ -253,6 +254,20 @@ export function requestJudeEnvironmentRefresh(): void {
 export function subscribeToJudeEnvironmentRefresh(listener: () => void): () => void {
   judeEnvironmentRefreshListeners.add(listener);
   return () => judeEnvironmentRefreshListeners.delete(listener);
+}
+
+/**
+ * Requests a connection to a shared Jude environment. Connections are kept for
+ * this renderer session so selecting an environment does not repeatedly issue
+ * pairing requests on every aggregate refresh.
+ */
+export function requestJudeEnvironmentConnection(sessionId: string): void {
+  requestedJudeEnvironmentConnectionIds.add(sessionId);
+  requestJudeEnvironmentRefresh();
+}
+
+export function isJudeEnvironmentConnectionRequested(sessionId: string): boolean {
+  return requestedJudeEnvironmentConnectionIds.has(sessionId);
 }
 
 function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {

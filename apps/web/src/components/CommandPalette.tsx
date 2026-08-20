@@ -167,6 +167,7 @@ import {
   judeSessionIdFromConnectionId,
   judeSessionOwnerLabel,
   judeSessionProjectPickerName,
+  requestJudeEnvironmentConnection,
 } from "../connection/jude";
 import { useJudeCurrentUser, useJudeSessions } from "../hooks/useJudeSessions";
 
@@ -1195,14 +1196,53 @@ function OpenCommandPaletteDialog(props: {
       }
     }
 
+    const connectedSessionIds = new Set(
+      [...judeSessionByEnvironmentId.values()].map((session) => session.id),
+    );
+    const sharedEnvironmentItems: CommandPaletteActionItem[] = judeSessions
+      .filter(
+        (session) =>
+          !isJudeSessionOwnedByCurrentUser(session, judeCurrentUser) &&
+          !connectedSessionIds.has(session.id) &&
+          session.urls.t3.trim().length > 0 &&
+          session.status !== "deleting",
+      )
+      .map((session) => {
+        const branch = judeSessionBranchName(session);
+        const owner = judeSessionOwnerLabel(session);
+        return {
+          kind: "action" as const,
+          value: `connect-jude-environment:${session.id}`,
+          searchTerms: [session.name, session.prompt, session.project, branch, owner].filter(
+            (term): term is string => Boolean(term),
+          ),
+          title: `Connect to ${judeSessionProjectPickerName(session)}`,
+          description: [branch, owner ? `By ${owner}` : null].filter(Boolean).join(" · "),
+          icon: <ServerIcon className={ITEM_ICON_CLASS} />,
+          run: async () => {
+            requestJudeEnvironmentConnection(session.id);
+          },
+        };
+      });
+
     return [
       ...(mine.length > 0 ? [{ value: "my-projects", label: "Mine", items: mine }] : []),
       ...(other.length > 0 ? [{ value: "other-projects", label: "Other", items: other }] : []),
+      ...(sharedEnvironmentItems.length > 0
+        ? [
+            {
+              value: "other-environments",
+              label: "Other environments",
+              items: sharedEnvironmentItems,
+            },
+          ]
+        : []),
     ];
   }, [
     currentProjectEnvironmentId,
     currentProjectId,
     judeCurrentUser,
+    judeSessions,
     judeSessionByEnvironmentId,
     pickerProjects,
     projectThreadItems,

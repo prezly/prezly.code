@@ -61,7 +61,10 @@ import {
 import { connectionStorageLayer } from "./storage";
 import { PRODUCT_PROFILE } from "../branding";
 import {
+  getJudeCurrentUserSnapshot,
   issueJudeT3Pairing,
+  isJudeEnvironmentConnectionRequested,
+  isJudeSessionOwnedByCurrentUser,
   judeSessionDisplayName,
   listJudeSessions,
   listJudeT3Environments,
@@ -425,6 +428,7 @@ const loadJudeConnectionRegistration = Effect.fn(
 // signature of their endpoint + token until bearer credentials approach expiry.
 const PLATFORM_POLL_INTERVAL = "3 seconds";
 const SECONDARY_BEARER_REFRESH_SKEW_MS = 5_000;
+const JUDE_BOOTSTRAP_CONCURRENCY = 6;
 
 export function secondaryBearerExpiresAtEpochMs(
   issuedAtEpochMs: number,
@@ -528,6 +532,17 @@ export function readyJudeT3SessionsToBootstrap(
   );
 }
 
+export function judeT3SessionsToBootstrap(
+  environments: ReadonlyArray<JudeT3Environment>,
+  currentUser = getJudeCurrentUserSnapshot(),
+): Array<{ readonly session: JudeSession }> {
+  return readyJudeT3SessionsToBootstrap(environments).filter(
+    ({ session }) =>
+      isJudeSessionOwnedByCurrentUser(session, currentUser) ||
+      isJudeEnvironmentConnectionRequested(session.id),
+  );
+}
+
 export function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
@@ -597,7 +612,13 @@ const platformConnectionSourceLayer = Layer.effect(
           }
           connectableSessions = [];
           for (const session of legacySessionsResult.success) {
-            if (canConnectToJudeT3Session(session)) connectableSessions.push({ session });
+            if (
+              canConnectToJudeT3Session(session) &&
+              (isJudeSessionOwnedByCurrentUser(session, getJudeCurrentUserSnapshot()) ||
+                isJudeEnvironmentConnectionRequested(session.id))
+            ) {
+              connectableSessions.push({ session });
+            }
           }
         } else {
           yield* Ref.set(judeSnapshotEtagRef, snapshot.etag ?? snapshot.revision);
@@ -611,7 +632,7 @@ const platformConnectionSourceLayer = Layer.effect(
           );
           // Snapshot readiness is credential-free. Request a short-lived,
           // single-use pairing artifact only for ready environments below.
-          connectableSessions = readyJudeT3SessionsToBootstrap(snapshot.environments);
+          connectableSessions = judeT3SessionsToBootstrap(snapshot.environments);
         }
 
         const next = new Map<string, CachedPlatformRegistration>();
@@ -658,7 +679,7 @@ const platformConnectionSourceLayer = Layer.effect(
                 registrations.push(cached.registration);
               }
             }),
-          { concurrency: 4, discard: true },
+          { concurrency: JUDE_BOOTSTRAP_CONCURRENCY, discard: true },
         );
 
         yield* Ref.set(cacheRef, next);

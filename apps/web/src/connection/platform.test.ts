@@ -8,12 +8,14 @@ import {
 import { describe, expect, it } from "@effect/vitest";
 import * as Effect from "effect/Effect";
 
+import { requestJudeEnvironmentConnection } from "./jude.ts";
 import {
   canConnectToJudeT3Session,
   canRetainCachedPlatformRegistrationAfterRefreshFailure,
   canReuseCachedPlatformRegistration,
   primaryRegistrationToRetainAfterTopologyRead,
   provisionDesktopSshEnvironment,
+  judeT3SessionsToBootstrap,
   readyJudeT3SessionsToBootstrap,
   readPrimaryEnvironmentTargetResult,
   secondaryRegistrationsToRetainAfterTopologyRead,
@@ -51,6 +53,45 @@ describe("Jude T3 discovery", () => {
     ];
 
     expect(readyJudeT3SessionsToBootstrap(environments)).toEqual([{ session: environments[0] }]);
+  });
+
+  it("bootstraps owned environments before shared environments", () => {
+    const environments = [
+      {
+        ...session,
+        id: "mine",
+        createdBy: { id: 1, login: "me", name: "Me" },
+        t3: { state: "ready" as const },
+      },
+      {
+        ...session,
+        id: "other",
+        createdBy: { id: 2, login: "other", name: "Other" },
+        t3: { state: "ready" as const },
+      },
+    ];
+
+    expect(judeT3SessionsToBootstrap(environments, { id: 1, login: "me", name: "Me" })).toEqual([
+      { session: environments[0] },
+    ]);
+  });
+
+  it("connects a shared environment only after the user opts in", () => {
+    const environment = {
+      ...session,
+      id: "shared-opt-in",
+      createdBy: { id: 2, login: "other", name: "Other" },
+      t3: { state: "ready" as const },
+    };
+    const currentUser = { id: 1, login: "me", name: "Me" };
+
+    expect(judeT3SessionsToBootstrap([environment], currentUser)).toEqual([]);
+
+    requestJudeEnvironmentConnection(environment.id);
+
+    expect(judeT3SessionsToBootstrap([environment], currentUser)).toEqual([
+      { session: environment },
+    ]);
   });
 });
 
