@@ -67,6 +67,7 @@ import {
   listJudeT3Environments,
   subscribeToJudeEnvironmentRefresh,
   type JudeSession,
+  type JudeT3Environment,
   type JudeT3Pairing,
 } from "./jude";
 
@@ -517,6 +518,16 @@ export function canConnectToJudeT3Session(session: JudeSession): boolean {
   return session.status !== "deleting" && session.urls.t3.trim().length > 0;
 }
 
+export function readyJudeT3SessionsToBootstrap(
+  environments: ReadonlyArray<JudeT3Environment>,
+): Array<{ readonly session: JudeSession }> {
+  return environments.flatMap((environment) =>
+    environment.t3.state === "ready" && canConnectToJudeT3Session(environment)
+      ? [{ session: environment }]
+      : [],
+  );
+}
+
 export function secondaryRegistrationsToRetainAfterTopologyRead(
   previous: ReadonlyMap<string, CachedPlatformRegistration>,
   topologyRead: DesktopSecondaryBootstrapsRead,
@@ -598,11 +609,9 @@ const platformConnectionSourceLayer = Layer.effect(
             judeSnapshotRetryAfterMsRef,
             Math.max(1_000, snapshot.retryAfterMs ?? 5_000, environmentRetryAfterMs),
           );
-          connectableSessions = snapshot.environments.flatMap((environment) =>
-            environment.t3.state === "ready" && environment.t3.pairing
-              ? [{ session: environment, pairing: environment.t3.pairing }]
-              : [],
-          );
+          // Snapshot readiness is credential-free. Request a short-lived,
+          // single-use pairing artifact only for ready environments below.
+          connectableSessions = readyJudeT3SessionsToBootstrap(snapshot.environments);
         }
 
         const next = new Map<string, CachedPlatformRegistration>();

@@ -193,11 +193,6 @@ describe("Jude discovery", () => {
                   urls: { t3: "https://website-fix-search.t3.jude.prezly.dev" },
                   t3: {
                     state: "ready",
-                    pairing: {
-                      pairingUrl: "https://website-fix-search.t3.jude.prezly.dev/pair#token=fresh",
-                      expiresAt: "2026-08-20T12:00:00.000Z",
-                      serverVersion: "1.0.0",
-                    },
                   },
                 },
               ],
@@ -235,20 +230,20 @@ describe("Jude discovery", () => {
     }),
   );
 
-  it.effect("keeps an environment snapshot usable when a pairing artifact is incomplete", () =>
+  it.effect("accepts credential-free ready environments", () =>
     Effect.gen(function* () {
       const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
         Response.json({
           revision: "43",
           environments: [
             {
-              id: "website-starting-pairing",
-              name: "website-starting-pairing",
+              id: "website-ready",
+              name: "website-ready",
               prompt: "Fix search",
               project: "website",
               status: "ready",
-              urls: { t3: "https://website-starting-pairing.t3.jude.prezly.dev" },
-              t3: { state: "ready", pairing: {} },
+              urls: { t3: "https://website-ready.t3.jude.prezly.dev" },
+              t3: { state: "ready" },
             },
           ],
         }),
@@ -256,9 +251,6 @@ describe("Jude discovery", () => {
 
       const snapshot = yield* listJudeT3Environments(null, fetch);
       expect(snapshot).toMatchObject({ _tag: "Updated", revision: "43" });
-      if (snapshot._tag === "Updated") {
-        expect(snapshot.environments[0]?.t3.pairing).toBeUndefined();
-      }
       expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
     }),
   );

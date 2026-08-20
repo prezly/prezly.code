@@ -14,6 +14,7 @@ import {
   canReuseCachedPlatformRegistration,
   primaryRegistrationToRetainAfterTopologyRead,
   provisionDesktopSshEnvironment,
+  readyJudeT3SessionsToBootstrap,
   readPrimaryEnvironmentTargetResult,
   secondaryRegistrationsToRetainAfterTopologyRead,
   secondaryBearerExpiresAtEpochMs,
@@ -40,6 +41,16 @@ describe("Jude T3 discovery", () => {
   it("does not connect sessions that are deleting or have no T3 endpoint", () => {
     expect(canConnectToJudeT3Session({ ...session, status: "deleting" })).toBe(false);
     expect(canConnectToJudeT3Session({ ...session, urls: { t3: " " } })).toBe(false);
+  });
+
+  it("requests a pairing artifact for every ready aggregate environment", () => {
+    const environments = [
+      { ...session, t3: { state: "ready" as const } },
+      { ...session, id: "app-starting", t3: { state: "starting" as const } },
+      { ...session, id: "app-unavailable", t3: { state: "unavailable" as const } },
+    ];
+
+    expect(readyJudeT3SessionsToBootstrap(environments)).toEqual([{ session: environments[0] }]);
   });
 });
 
