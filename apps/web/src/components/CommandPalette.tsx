@@ -1152,6 +1152,53 @@ function OpenCommandPaletteDialog(props: {
     ],
   );
 
+  const projectThreadGroups = useMemo(() => {
+    const currentPrefix =
+      currentProjectEnvironmentId && currentProjectId
+        ? `new-thread-in:${currentProjectEnvironmentId}:${currentProjectId}`
+        : null;
+    const orderedItems = currentPrefix
+      ? [
+          ...projectThreadItems.filter((item) => item.value === currentPrefix),
+          ...projectThreadItems.filter((item) => item.value !== currentPrefix),
+        ]
+      : projectThreadItems;
+
+    if (!PRODUCT_CAPABILITIES.managedProjects) {
+      return [{ value: "projects", label: "Projects", items: orderedItems }];
+    }
+
+    const projectByItemValue = new Map<string, (typeof pickerProjects)[number]>(
+      pickerProjects.map(
+        (project) => [`new-thread-in:${project.environmentId}:${project.id}`, project] as const,
+      ),
+    );
+    const mine = [] as typeof orderedItems;
+    const other = [] as typeof orderedItems;
+    for (const item of orderedItems) {
+      const project = projectByItemValue.get(item.value);
+      if (!project) continue;
+      const session = judeSessionByEnvironmentId.get(project.environmentId);
+      if (session && isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)) {
+        mine.push(item);
+      } else {
+        other.push(item);
+      }
+    }
+
+    return [
+      ...(mine.length > 0 ? [{ value: "my-projects", label: "Mine", items: mine }] : []),
+      ...(other.length > 0 ? [{ value: "other-projects", label: "Other", items: other }] : []),
+    ];
+  }, [
+    currentProjectEnvironmentId,
+    currentProjectId,
+    judeCurrentUser,
+    judeSessionByEnvironmentId,
+    pickerProjects,
+    projectThreadItems,
+  ]);
+
   const allThreadItems = useMemo(
     () =>
       buildThreadActionItems({
@@ -1519,7 +1566,7 @@ function OpenCommandPaletteDialog(props: {
   }, [clearOpenIntent, openAddProjectFlow, openIntent]);
 
   useLayoutEffect(() => {
-    if (openIntent?.kind !== "new-thread-in" || projectThreadItems.length === 0) {
+    if (openIntent?.kind !== "new-thread-in" || projectThreadGroups.length === 0) {
       return;
     }
     clearOpenIntent();
@@ -1527,35 +1574,14 @@ function OpenCommandPaletteDialog(props: {
     setAddProjectCloneFlow(null);
     setViewStack([]);
     setQuery("");
-    const currentPrefix =
-      currentProjectEnvironmentId && currentProjectId
-        ? `new-thread-in:${currentProjectEnvironmentId}:${currentProjectId}`
-        : null;
-    const prioritized = currentPrefix
-      ? [
-          ...projectThreadItems.filter((item) => item.value === currentPrefix),
-          ...projectThreadItems.filter((item) => item.value !== currentPrefix),
-        ]
-      : projectThreadItems;
     pushPaletteView({
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [
-        {
-          value: "projects",
-          label: "Projects",
-          items: enumerateCommandPaletteItems(prioritized),
-        },
-      ],
+      groups: projectThreadGroups.map((group) => ({
+        ...group,
+        items: enumerateCommandPaletteItems(group.items),
+      })),
     });
-  }, [
-    clearOpenIntent,
-    browseNavigation,
-    currentProjectEnvironmentId,
-    currentProjectId,
-    openIntent,
-    projectThreadItems,
-    pushPaletteView,
-  ]);
+  }, [clearOpenIntent, browseNavigation, openIntent, projectThreadGroups, pushPaletteView]);
 
   const actionItems: Array<CommandPaletteActionItem | CommandPaletteSubmenuItem> = [];
 
@@ -1594,7 +1620,7 @@ function OpenCommandPaletteDialog(props: {
       title: "New thread in...",
       icon: <SquarePenIcon className={ITEM_ICON_CLASS} />,
       addonIcon: <SquarePenIcon className={ADDON_ICON_CLASS} />,
-      groups: [{ value: "projects", label: "Projects", items: projectThreadItems }],
+      groups: projectThreadGroups,
     });
   }
 

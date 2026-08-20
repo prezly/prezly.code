@@ -11,6 +11,7 @@ import { Empty, EmptyDescription, EmptyHeader, EmptyTitle } from "../components/
 import { SidebarInset } from "../components/ui/sidebar";
 import { WorkspacePageHeader } from "../components/WorkspacePageHeader";
 import { useNewThreadHandler } from "../hooks/useHandleNewThread";
+import { useJudeSessionDiscoveryState } from "../hooks/useJudeSessions";
 import {
   useAllEnvironmentShellsBootstrapped,
   useProjects,
@@ -44,6 +45,7 @@ function IndexDraftLanding() {
   const projects = useProjects();
   const threads = useThreadShells();
   const bootstrapped = useAllEnvironmentShellsBootstrapped();
+  const judeSessionDiscoveryState = useJudeSessionDiscoveryState();
   const handleNewThread = useNewThreadHandler();
   const startingRef = useRef(false);
   const [startState, setStartState] = useState({ failed: false, retryRequest: 0 });
@@ -72,6 +74,9 @@ function IndexDraftLanding() {
   if (!bootstrapped) {
     return null;
   }
+  if (PRODUCT_CAPABILITIES.managedProjects && judeSessionDiscoveryState !== "ready") {
+    return <JudeConnectionState failed={judeSessionDiscoveryState === "error"} />;
+  }
   if (mostRecentProject !== null) {
     return startState.failed ? (
       <DraftStartError
@@ -85,6 +90,25 @@ function IndexDraftLanding() {
     ) : null;
   }
   return <NoProjectsHero />;
+}
+
+function JudeConnectionState({ failed }: { readonly failed: boolean }) {
+  return (
+    <SidebarInset className="h-dvh min-h-0 overflow-hidden overscroll-y-none bg-background text-foreground">
+      <Empty className="flex-1">
+        <EmptyHeader className="max-w-md">
+          <EmptyTitle className="text-foreground text-xl">
+            {failed ? "Couldn’t reach Jude" : "Connecting to Jude…"}
+          </EmptyTitle>
+          <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
+            {failed
+              ? "Jude environments will appear once the connection is available."
+              : "Loading your Jude environments."}
+          </EmptyDescription>
+        </EmptyHeader>
+      </Empty>
+    </SidebarInset>
+  );
 }
 
 function DraftStartError({ onRetry }: { readonly onRetry: () => void }) {

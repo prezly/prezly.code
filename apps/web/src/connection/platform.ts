@@ -378,16 +378,21 @@ const loadJudeConnectionRegistration = Effect.fn(
         detail: `Jude returned an invalid T3 pairing URL for ${session.name}: ${String(cause)}`,
       }),
   });
-  const descriptor = yield* fetchRemoteEnvironmentDescriptor({
-    httpBaseUrl: pairingTarget.httpBaseUrl,
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  const [descriptor, access] = yield* Effect.all(
+    [
+      fetchRemoteEnvironmentDescriptor({ httpBaseUrl: pairingTarget.httpBaseUrl }).pipe(
+        Effect.mapError(mapRemoteEnvironmentError),
+      ),
+      bootstrapRemoteBearerSession({
+        httpBaseUrl: pairingTarget.httpBaseUrl,
+        credential: pairingTarget.credential,
+        scopes: AuthStandardClientScopes,
+        clientMetadata: clientMetadata(),
+      }).pipe(Effect.mapError(mapRemoteEnvironmentError)),
+    ],
+    { concurrency: "unbounded" },
+  );
   const issuedAtEpochMs = yield* Clock.currentTimeMillis;
-  const access = yield* bootstrapRemoteBearerSession({
-    httpBaseUrl: pairingTarget.httpBaseUrl,
-    credential: pairingTarget.credential,
-    scopes: AuthStandardClientScopes,
-    clientMetadata: clientMetadata(),
-  }).pipe(Effect.mapError(mapRemoteEnvironmentError));
   const connectionId = `jude:${session.id}`;
   const label = judeSessionDisplayName(session) || descriptor.label;
 
@@ -601,9 +606,10 @@ const platformConnectionSourceLayer = Layer.effect(
       }).pipe(Effect.provide(FetchHttpClient.layer));
 
       return PlatformConnectionSource.of({
-        registrations: Stream.merge(Stream.tick(PLATFORM_POLL_INTERVAL), manualRefreshes).pipe(
-          Stream.mapEffect(() => buildJudePlatformRegistrations),
-        ),
+        registrations: Stream.merge(
+          Stream.concat(Stream.succeed(undefined), Stream.tick(PLATFORM_POLL_INTERVAL)),
+          manualRefreshes,
+        ).pipe(Stream.mapEffect(() => buildJudePlatformRegistrations)),
       });
     }
 

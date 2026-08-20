@@ -11,6 +11,7 @@ import {
   formatJudeAppName,
   getCreatedJudeSessionIdsSnapshot,
   getJudeCurrentUserSnapshot,
+  getJudeSessionDiscoveryStateSnapshot,
   getJudeSessionsSnapshot,
   isJudeSessionOwnedByCurrentUser,
   issueJudeT3Pairing,
@@ -152,6 +153,22 @@ describe("Jude discovery", () => {
       ]);
       expect(getCreatedJudeSessionIdsSnapshot()).toBe(createdSessionIdsBeforeDiscovery);
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
+    }),
+  );
+
+  it.effect("only marks Jude discovery ready after a successful session read", () =>
+    Effect.gen(function* () {
+      const unavailable = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 503 }));
+      yield* Effect.exit(listJudeSessions(unavailable));
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("error");
+
+      const available = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(Response.json({ sessions: [] }));
+      yield* listJudeSessions(available);
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
     }),
   );
 

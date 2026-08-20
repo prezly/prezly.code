@@ -122,6 +122,7 @@ import { useProjects, useThreadShells } from "../state/entities";
 import {
   useCreatedJudeSessionIds,
   useJudeCurrentUser,
+  useJudeSessionDiscoveryState,
   useJudeSessions,
 } from "../hooks/useJudeSessions";
 import { environmentServerConfigsAtom, primaryServerKeybindingsAtom } from "../state/server";
@@ -1831,8 +1832,11 @@ export default function Sidebar() {
   }, []);
   const { environments } = useEnvironments();
   const judeSessions = useJudeSessions();
+  const judeSessionDiscoveryState = useJudeSessionDiscoveryState();
   const judeCurrentUser = useJudeCurrentUser();
   const createdJudeSessionIds = useCreatedJudeSessionIds();
+  const showWorkspaceControls =
+    !PRODUCT_CAPABILITIES.managedProjects || judeSessionDiscoveryState === "ready";
   const primaryEnvironmentId = usePrimaryEnvironmentId();
   const clearSelection = useThreadSelectionStore((s) => s.clearSelection);
   const setSelectionAnchor = useThreadSelectionStore((s) => s.setAnchor);
@@ -3509,317 +3513,321 @@ export default function Sidebar() {
       <SidebarContent
         className="gap-0"
         fixedHeader={
-          // Lifted above the stage backdrop, whose fade bleeds below the
-          // header and would otherwise paint across the search row's outline.
-          <SidebarGroup className="relative z-[1] gap-1 p-[var(--sidebar-content-inset)]">
-            <div className="flex items-center gap-1">
-              <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
-                <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
-                <Input
-                  ref={threadSearchInputRef}
-                  nativeInput
-                  unstyled
-                  type="search"
-                  value={threadSearchQuery}
-                  onChange={(event) => {
-                    setThreadSearchQuery(event.currentTarget.value);
-                    setActiveSearchResultIndex(0);
-                  }}
-                  onKeyDown={handleThreadSearchKeyDown}
-                  placeholder="Search"
-                  aria-label="Search threads"
-                  role="combobox"
-                  aria-autocomplete="list"
-                  aria-expanded={isSearchingThreads && threadSearchResults.length > 0}
-                  aria-controls={
-                    isSearchingThreads && threadSearchResults.length > 0
-                      ? "sidebar-thread-search-results"
-                      : undefined
-                  }
-                  aria-activedescendant={
-                    isSearchingThreads && threadSearchResults[activeSearchResultIndex]
-                      ? `sidebar-thread-search-result-${activeSearchResultIndex}`
-                      : undefined
-                  }
-                  className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
-                />
-                {isSearchingThreads ? (
-                  <Button
-                    type="button"
-                    size="icon-micro"
-                    variant="ghost"
-                    className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
-                    aria-label="Clear thread search"
-                    onClick={() => {
-                      clearThreadSearch();
-                      threadSearchInputRef.current?.focus();
-                    }}
-                  >
-                    <XIcon className="size-3" />
-                  </Button>
-                ) : null}
-              </div>
-              <div className="shrink-0">
-                <Tooltip>
-                  <TooltipTrigger
-                    render={
-                      <SidebarMenuButton
-                        size="icon"
-                        type="button"
-                        className="relative focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                        onClick={handleNewThreadClick}
-                        disabled={projects.length === 0}
-                        aria-label="New thread"
-                      />
-                    }
-                  >
-                    <SquarePenIcon />
-                    <span
-                      className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
-                      aria-hidden="true"
-                    />
-                  </TooltipTrigger>
-                  <TooltipPopup side="right">
-                    {projectGroups.length > 1 ? (
-                      <span className="flex flex-col gap-0.5">
-                        <span>
-                          {newThreadShortcutLabel
-                            ? `New thread (${newThreadShortcutLabel})`
-                            : "New thread"}
-                        </span>
-                        <span className="text-muted-foreground">
-                          New thread in current project: Shift+click
-                          {newThreadInProjectShortcutLabel
-                            ? ` (${newThreadInProjectShortcutLabel})`
-                            : ""}
-                        </span>
-                      </span>
-                    ) : newThreadShortcutLabel ? (
-                      `New thread (${newThreadShortcutLabel})`
-                    ) : (
-                      "New thread"
-                    )}
-                  </TooltipPopup>
-                </Tooltip>
-              </div>
-            </div>
-            {PRODUCT_CAPABILITIES.managedProjects ? (
-              <div className="flex flex-col gap-px">
-                <SidebarMenuButton
-                  type="button"
-                  onClick={openCreateJudeProject}
-                  className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                >
-                  <FolderPlusIcon className="size-4 shrink-0" />
-                  <span>Create Jude environment</span>
-                </SidebarMenuButton>
-                {managedJudeProjectRows.map(({ session, project }) => {
-                  const displayName = judeSessionDisplayName(session);
-                  if (project) {
-                    return (
-                      <SidebarMenuButton
-                        key={session.id}
-                        type="button"
-                        onClick={() => {
-                          void newThreadContext.handleNewThread(
-                            scopeProjectRef(project.environmentId, project.id),
-                          );
-                          if (isMobile) setOpenMobile(false);
-                        }}
-                        className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                        title={`New prompt in ${displayName}`}
-                      >
-                        <ProjectFavicon
-                          environmentId={project.environmentId}
-                          cwd={project.workspaceRoot}
-                          className="size-4 shrink-0"
-                        />
-                        <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                      </SidebarMenuButton>
-                    );
-                  }
-                  const statusLabel =
-                    session.status === "failed"
-                      ? "Failed"
-                      : session.status === "ready"
-                        ? "Connecting…"
-                        : session.status === "degraded"
-                          ? "Degraded"
-                          : session.status === "deleting"
-                            ? "Deleting…"
-                            : "Provisioning…";
-                  return (
-                    <SidebarMenuButton
-                      key={session.id}
-                      type="button"
-                      disabled
-                      aria-label={`${displayName}, ${statusLabel}`}
-                      className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] disabled:opacity-100"
-                    >
-                      {session.status === "failed" ? (
-                        <CircleAlertIcon className="size-4 shrink-0 text-destructive" />
-                      ) : (
-                        <CircleDashedIcon className="size-4 shrink-0 text-muted-foreground" />
-                      )}
-                      <span className="min-w-0 flex-1 truncate">{displayName}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        {statusLabel}
-                      </span>
-                    </SidebarMenuButton>
-                  );
-                })}
-              </div>
-            ) : null}
-            {projectGroups.length > 0 ? (
+          showWorkspaceControls ? (
+            // Lifted above the stage backdrop, whose fade bleeds below the
+            // header and would otherwise paint across the search row's outline.
+            <SidebarGroup className="relative z-[1] gap-1 p-[var(--sidebar-content-inset)]">
               <div className="flex items-center gap-1">
-                <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>
-                  <MenuTrigger
-                    render={
-                      <SidebarMenuButton
-                        aria-label="Filter threads by project"
-                        className="min-w-0 flex-1 ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                      />
+                <div className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1.5 text-sm font-medium text-sidebar-muted-foreground hover:bg-sidebar-row-hover hover:text-sidebar-foreground">
+                  <SearchIcon className="size-4 shrink-0 text-sidebar-muted-foreground/80" />
+                  <Input
+                    ref={threadSearchInputRef}
+                    nativeInput
+                    unstyled
+                    type="search"
+                    value={threadSearchQuery}
+                    onChange={(event) => {
+                      setThreadSearchQuery(event.currentTarget.value);
+                      setActiveSearchResultIndex(0);
+                    }}
+                    onKeyDown={handleThreadSearchKeyDown}
+                    placeholder="Search"
+                    aria-label="Search threads"
+                    role="combobox"
+                    aria-autocomplete="list"
+                    aria-expanded={isSearchingThreads && threadSearchResults.length > 0}
+                    aria-controls={
+                      isSearchingThreads && threadSearchResults.length > 0
+                        ? "sidebar-thread-search-results"
+                        : undefined
                     }
-                  >
-                    {scopedProjectGroup ? (
-                      <ProjectFavicon
-                        environmentId={scopedProjectGroup.environmentId}
-                        cwd={scopedProjectGroup.workspaceRoot}
-                        faviconPath={scopedProjectGroup.faviconPath}
-                        className="size-4 shrink-0"
-                      />
-                    ) : (
-                      <FolderIcon className="size-4 shrink-0" />
-                    )}
-                    <span className="min-w-0 flex-1 truncate">
-                      {scopedProjectGroup
-                        ? projectPickerDisplayName(scopedProjectGroup)
-                        : "All projects"}
-                    </span>
-                    <ChevronDownIcon className="-mr-px size-4 shrink-0" />
-                  </MenuTrigger>
-                  <MenuPopup align="start" className="w-(--anchor-width)">
-                    <MenuRadioGroup
-                      value={projectScopeKey ?? "all"}
-                      onValueChange={(value) =>
-                        setProjectScopeKey(value === "all" ? null : (value as string))
-                      }
+                    aria-activedescendant={
+                      isSearchingThreads && threadSearchResults[activeSearchResultIndex]
+                        ? `sidebar-thread-search-result-${activeSearchResultIndex}`
+                        : undefined
+                    }
+                    className="min-w-0 flex-1 [&_[data-slot=input]]:h-auto [&_[data-slot=input]]:p-0 [&_[data-slot=input]]:leading-normal [&_[data-slot=input]]:text-sm [&_[data-slot=input]]:font-medium [&_[data-slot=input]]:text-sidebar-foreground [&_[data-slot=input]]:placeholder:text-sidebar-muted-foreground"
+                  />
+                  {isSearchingThreads ? (
+                    <Button
+                      type="button"
+                      size="icon-micro"
+                      variant="ghost"
+                      className="shrink-0 text-sidebar-muted-foreground hover:bg-sidebar-control-surface hover:text-sidebar-foreground"
+                      aria-label="Clear thread search"
+                      onClick={() => {
+                        clearThreadSearch();
+                        threadSearchInputRef.current?.focus();
+                      }}
                     >
-                      <MenuRadioItem
-                        value="all"
-                        closeOnClick
-                        className="h-8 min-h-8 px-1 py-0 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
-                      >
-                        <FolderIcon className="size-4 shrink-0" />
-                        <span className="min-w-0 truncate text-sm">All projects</span>
-                      </MenuRadioItem>
-                      {projectPickerSections.map((section) => (
-                        <MenuGroup key={section.label ?? "projects"}>
-                          {section.label ? (
-                            <MenuGroupLabel className="px-1.5 pb-0.5 pt-2 first:pt-1">
-                              {section.label}
-                            </MenuGroupLabel>
-                          ) : null}
-                          {section.projects.map((project) => {
-                            const scopeKey = project.projectKey;
-                            const pickerDisplayName = projectPickerDisplayName(project);
-                            const session = judeSessionByEnvironmentId.get(project.environmentId);
-                            const ownerLabel = session ? judeSessionOwnerLabel(session) : null;
-                            const isMine = session
-                              ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
-                              : false;
-                            return (
-                              <MenuRadioItem
-                                key={scopeKey}
-                                value={scopeKey}
-                                closeOnClick
-                                className="min-h-10 px-1 py-1 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
-                              >
-                                <ProjectFavicon
-                                  environmentId={project.environmentId}
-                                  cwd={project.workspaceRoot}
-                                  faviconPath={project.faviconPath}
-                                  className="size-4 shrink-0"
-                                />
-                                <span className="flex min-w-0 flex-1 flex-col">
-                                  <span className="truncate text-sm">{pickerDisplayName}</span>
-                                  {ownerLabel ? (
-                                    <span className="truncate font-normal text-muted-foreground text-xs">
-                                      {isMine ? `Mine · ${ownerLabel}` : `By ${ownerLabel}`}
-                                    </span>
-                                  ) : null}
-                                </span>
-                                {PRODUCT_CAPABILITIES.allowProjectManagement ? (
-                                  <Button
-                                    size="icon-xs"
-                                    variant="ghost-muted"
-                                    aria-label={`Project settings for ${project.displayName}`}
-                                    title={`Project settings for ${project.displayName}`}
-                                    className="ml-auto size-6 [--control-icon-color:currentColor] text-icon-muted focus-visible:bg-accent focus-visible:text-foreground"
-                                    onPointerDown={(event) => event.stopPropagation()}
-                                    onClick={(event) => {
-                                      void handleProjectSettings(event, project);
-                                    }}
-                                  >
-                                    <SettingsIcon className="size-3.5" />
-                                  </Button>
-                                ) : null}
-                              </MenuRadioItem>
-                            );
-                          })}
-                        </MenuGroup>
-                      ))}
-                    </MenuRadioGroup>
-                  </MenuPopup>
-                </Menu>
-                {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                      <XIcon className="size-3" />
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="shrink-0">
                   <Tooltip>
                     <TooltipTrigger
                       render={
                         <SidebarMenuButton
                           size="icon"
-                          className="relative shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                          onClick={openAddProjectCommandPalette}
                           type="button"
-                          aria-label="New project"
+                          className="relative focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                          onClick={handleNewThreadClick}
+                          disabled={projects.length === 0}
+                          aria-label="New thread"
                         />
                       }
                     >
-                      <FolderPlusIcon />
+                      <SquarePenIcon />
                       <span
                         className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
                         aria-hidden="true"
                       />
                     </TooltipTrigger>
-                    <TooltipPopup side="right">New project</TooltipPopup>
+                    <TooltipPopup side="right">
+                      {projectGroups.length > 1 ? (
+                        <span className="flex flex-col gap-0.5">
+                          <span>
+                            {newThreadShortcutLabel
+                              ? `New thread (${newThreadShortcutLabel})`
+                              : "New thread"}
+                          </span>
+                          <span className="text-muted-foreground">
+                            New thread in current project: Shift+click
+                            {newThreadInProjectShortcutLabel
+                              ? ` (${newThreadInProjectShortcutLabel})`
+                              : ""}
+                          </span>
+                        </span>
+                      ) : newThreadShortcutLabel ? (
+                        `New thread (${newThreadShortcutLabel})`
+                      ) : (
+                        "New thread"
+                      )}
+                    </TooltipPopup>
                   </Tooltip>
-                ) : null}
-                {PRODUCT_CAPABILITIES.managedProjects ? (
-                  <Tooltip>
-                    <TooltipTrigger
+                </div>
+              </div>
+              {PRODUCT_CAPABILITIES.managedProjects ? (
+                <div className="flex flex-col gap-px">
+                  <SidebarMenuButton
+                    type="button"
+                    onClick={openCreateJudeProject}
+                    className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] font-medium focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                  >
+                    <FolderPlusIcon className="size-4 shrink-0" />
+                    <span>Create Jude environment</span>
+                  </SidebarMenuButton>
+                  {managedJudeProjectRows.map(({ session, project }) => {
+                    const displayName = judeSessionDisplayName(session);
+                    if (project) {
+                      return (
+                        <SidebarMenuButton
+                          key={session.id}
+                          type="button"
+                          onClick={() => {
+                            void newThreadContext.handleNewThread(
+                              scopeProjectRef(project.environmentId, project.id),
+                            );
+                            if (isMobile) setOpenMobile(false);
+                          }}
+                          className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                          title={`New prompt in ${displayName}`}
+                        >
+                          <ProjectFavicon
+                            environmentId={project.environmentId}
+                            cwd={project.workspaceRoot}
+                            className="size-4 shrink-0"
+                          />
+                          <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                        </SidebarMenuButton>
+                      );
+                    }
+                    const statusLabel =
+                      session.status === "failed"
+                        ? "Failed"
+                        : session.status === "ready"
+                          ? "Connecting…"
+                          : session.status === "degraded"
+                            ? "Degraded"
+                            : session.status === "deleting"
+                              ? "Deleting…"
+                              : "Provisioning…";
+                    return (
+                      <SidebarMenuButton
+                        key={session.id}
+                        type="button"
+                        disabled
+                        aria-label={`${displayName}, ${statusLabel}`}
+                        className="w-full ps-[calc(var(--sidebar-row-content-inset)-1px)] disabled:opacity-100"
+                      >
+                        {session.status === "failed" ? (
+                          <CircleAlertIcon className="size-4 shrink-0 text-destructive" />
+                        ) : (
+                          <CircleDashedIcon className="size-4 shrink-0 text-muted-foreground" />
+                        )}
+                        <span className="min-w-0 flex-1 truncate">{displayName}</span>
+                        <span className="shrink-0 text-[10px] text-muted-foreground">
+                          {statusLabel}
+                        </span>
+                      </SidebarMenuButton>
+                    );
+                  })}
+                </div>
+              ) : null}
+              {projectGroups.length > 0 ? (
+                <div className="flex items-center gap-1">
+                  <Menu open={projectScopeMenuOpen} onOpenChange={setProjectScopeMenuOpen}>
+                    <MenuTrigger
                       render={
                         <SidebarMenuButton
-                          size="icon"
-                          type="button"
-                          className="shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
-                          aria-label="Refresh Jude environments"
-                          disabled={isRefreshingJude}
-                          onClick={() => void handleRefreshJude()}
+                          aria-label="Filter threads by project"
+                          className="min-w-0 flex-1 ps-[calc(var(--sidebar-row-content-inset)-1px)] focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
                         />
                       }
                     >
-                      <RefreshCwIcon className={cn("size-4", isRefreshingJude && "animate-spin")} />
-                    </TooltipTrigger>
-                    <TooltipPopup side="right">
-                      {isRefreshingJude
-                        ? "Refreshing Jude environments…"
-                        : "Refresh Jude environments"}
-                    </TooltipPopup>
-                  </Tooltip>
-                ) : null}
-              </div>
-            ) : null}
-          </SidebarGroup>
+                      {scopedProjectGroup ? (
+                        <ProjectFavicon
+                          environmentId={scopedProjectGroup.environmentId}
+                          cwd={scopedProjectGroup.workspaceRoot}
+                          faviconPath={scopedProjectGroup.faviconPath}
+                          className="size-4 shrink-0"
+                        />
+                      ) : (
+                        <FolderIcon className="size-4 shrink-0" />
+                      )}
+                      <span className="min-w-0 flex-1 truncate">
+                        {scopedProjectGroup
+                          ? projectPickerDisplayName(scopedProjectGroup)
+                          : "All projects"}
+                      </span>
+                      <ChevronDownIcon className="-mr-px size-4 shrink-0" />
+                    </MenuTrigger>
+                    <MenuPopup align="start" className="w-(--anchor-width)">
+                      <MenuRadioGroup
+                        value={projectScopeKey ?? "all"}
+                        onValueChange={(value) =>
+                          setProjectScopeKey(value === "all" ? null : (value as string))
+                        }
+                      >
+                        <MenuRadioItem
+                          value="all"
+                          closeOnClick
+                          className="h-8 min-h-8 px-1 py-0 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
+                        >
+                          <FolderIcon className="size-4 shrink-0" />
+                          <span className="min-w-0 truncate text-sm">All projects</span>
+                        </MenuRadioItem>
+                        {projectPickerSections.map((section) => (
+                          <MenuGroup key={section.label ?? "projects"}>
+                            {section.label ? (
+                              <MenuGroupLabel className="px-1.5 pb-0.5 pt-2 first:pt-1">
+                                {section.label}
+                              </MenuGroupLabel>
+                            ) : null}
+                            {section.projects.map((project) => {
+                              const scopeKey = project.projectKey;
+                              const pickerDisplayName = projectPickerDisplayName(project);
+                              const session = judeSessionByEnvironmentId.get(project.environmentId);
+                              const ownerLabel = session ? judeSessionOwnerLabel(session) : null;
+                              const isMine = session
+                                ? isJudeSessionOwnedByCurrentUser(session, judeCurrentUser)
+                                : false;
+                              return (
+                                <MenuRadioItem
+                                  key={scopeKey}
+                                  value={scopeKey}
+                                  closeOnClick
+                                  className="min-h-10 px-1 py-1 text-sm font-medium [&>span:last-child]:flex [&>span:last-child]:min-w-0 [&>span:last-child]:items-center [&>span:last-child]:gap-2"
+                                >
+                                  <ProjectFavicon
+                                    environmentId={project.environmentId}
+                                    cwd={project.workspaceRoot}
+                                    faviconPath={project.faviconPath}
+                                    className="size-4 shrink-0"
+                                  />
+                                  <span className="flex min-w-0 flex-1 flex-col">
+                                    <span className="truncate text-sm">{pickerDisplayName}</span>
+                                    {ownerLabel ? (
+                                      <span className="truncate font-normal text-muted-foreground text-xs">
+                                        {isMine ? `Mine · ${ownerLabel}` : `By ${ownerLabel}`}
+                                      </span>
+                                    ) : null}
+                                  </span>
+                                  {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                                    <Button
+                                      size="icon-xs"
+                                      variant="ghost-muted"
+                                      aria-label={`Project settings for ${project.displayName}`}
+                                      title={`Project settings for ${project.displayName}`}
+                                      className="ml-auto size-6 [--control-icon-color:currentColor] text-icon-muted focus-visible:bg-accent focus-visible:text-foreground"
+                                      onPointerDown={(event) => event.stopPropagation()}
+                                      onClick={(event) => {
+                                        void handleProjectSettings(event, project);
+                                      }}
+                                    >
+                                      <SettingsIcon className="size-3.5" />
+                                    </Button>
+                                  ) : null}
+                                </MenuRadioItem>
+                              );
+                            })}
+                          </MenuGroup>
+                        ))}
+                      </MenuRadioGroup>
+                    </MenuPopup>
+                  </Menu>
+                  {PRODUCT_CAPABILITIES.allowProjectManagement ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <SidebarMenuButton
+                            size="icon"
+                            className="relative shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                            onClick={openAddProjectCommandPalette}
+                            type="button"
+                            aria-label="New project"
+                          />
+                        }
+                      >
+                        <FolderPlusIcon />
+                        <span
+                          className="pointer-events-none absolute left-1/2 top-1/2 size-[max(100%,3rem)] -translate-1/2 pointer-fine:hidden"
+                          aria-hidden="true"
+                        />
+                      </TooltipTrigger>
+                      <TooltipPopup side="right">New project</TooltipPopup>
+                    </Tooltip>
+                  ) : null}
+                  {PRODUCT_CAPABILITIES.managedProjects ? (
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <SidebarMenuButton
+                            size="icon"
+                            type="button"
+                            className="shrink-0 focus-visible:ring-offset-2 focus-visible:ring-offset-sidebar"
+                            aria-label="Refresh Jude environments"
+                            disabled={isRefreshingJude}
+                            onClick={() => void handleRefreshJude()}
+                          />
+                        }
+                      >
+                        <RefreshCwIcon
+                          className={cn("size-4", isRefreshingJude && "animate-spin")}
+                        />
+                      </TooltipTrigger>
+                      <TooltipPopup side="right">
+                        {isRefreshingJude
+                          ? "Refreshing Jude environments…"
+                          : "Refresh Jude environments"}
+                      </TooltipPopup>
+                    </Tooltip>
+                  ) : null}
+                </div>
+              ) : null}
+            </SidebarGroup>
+          ) : null
         }
       >
         <SidebarGroup className="ps-[calc(var(--sidebar-content-inset)+1px)] pe-[var(--sidebar-content-inset)] pb-1 pt-0">

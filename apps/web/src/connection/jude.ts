@@ -65,6 +65,7 @@ let judeAuthenticationPromise: Promise<void> | null = null;
 
 export type JudeSession = typeof JudeSessionSchema.Type;
 export type JudeCurrentUser = typeof JudeCreatorSchema.Type;
+export type JudeSessionDiscoveryState = "pending" | "ready" | "error";
 
 export function isJudeSessionOperational(session: JudeSession): boolean {
   return session.status === "ready" || session.status === "degraded";
@@ -83,6 +84,8 @@ export interface CreateJudeSessionInput {
 let judeSessionsSnapshot: ReadonlyArray<JudeSession> = [];
 let judeSessionsSignature = "[]";
 const judeSessionsListeners = new Set<() => void>();
+let judeSessionDiscoveryStateSnapshot: JudeSessionDiscoveryState = "pending";
+const judeSessionDiscoveryStateListeners = new Set<() => void>();
 let judeCurrentUserSnapshot: JudeCurrentUser | null = null;
 const judeCurrentUserListeners = new Set<() => void>();
 let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
@@ -157,6 +160,15 @@ export function subscribeToJudeSessions(listener: () => void): () => void {
   return () => judeSessionsListeners.delete(listener);
 }
 
+export function getJudeSessionDiscoveryStateSnapshot(): JudeSessionDiscoveryState {
+  return judeSessionDiscoveryStateSnapshot;
+}
+
+export function subscribeToJudeSessionDiscoveryState(listener: () => void): () => void {
+  judeSessionDiscoveryStateListeners.add(listener);
+  return () => judeSessionDiscoveryStateListeners.delete(listener);
+}
+
 export function getJudeCurrentUserSnapshot(): JudeCurrentUser | null {
   return judeCurrentUserSnapshot;
 }
@@ -197,6 +209,12 @@ function publishJudeSessions(sessions: ReadonlyArray<JudeSession>): void {
   judeSessionsSignature = signature;
   judeSessionsSnapshot = sessions;
   for (const listener of judeSessionsListeners) listener();
+}
+
+function publishJudeSessionDiscoveryState(state: JudeSessionDiscoveryState): void {
+  if (state === judeSessionDiscoveryStateSnapshot) return;
+  judeSessionDiscoveryStateSnapshot = state;
+  for (const listener of judeSessionDiscoveryStateListeners) listener();
 }
 
 function publishJudeCurrentUser(user: JudeCurrentUser): void {
@@ -303,17 +321,20 @@ export const ensureJudeAuthenticated = Effect.fn("web.jude.ensureAuthenticated")
 export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
   fetch: typeof globalThis.fetch = globalThis.fetch,
 ) {
-  const body = yield* requestJson({
-    fetch,
-    operation: "session discovery",
-    path: "/api/sessions",
-    method: "GET",
-  });
-  const response = yield* decodeJudeSessionsResponse(body).pipe(
-    Effect.mapError((cause) => discoveryError("session discovery", cause)),
-  );
-  publishJudeSessions(response.sessions);
-  return response.sessions;
+  return yield* Effect.gen(function* () {
+    const body = yield* requestJson({
+      fetch,
+      operation: "session discovery",
+      path: "/api/sessions",
+      method: "GET",
+    });
+    const response = yield* decodeJudeSessionsResponse(body).pipe(
+      Effect.mapError((cause) => discoveryError("session discovery", cause)),
+    );
+    publishJudeSessions(response.sessions);
+    publishJudeSessionDiscoveryState("ready");
+    return response.sessions;
+  }).pipe(Effect.tapError(() => Effect.sync(() => publishJudeSessionDiscoveryState("error"))));
 });
 
 export function refreshJudeEnvironments(): Promise<ReadonlyArray<JudeSession>> {

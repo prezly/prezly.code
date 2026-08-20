@@ -3,11 +3,14 @@ import { useSyncExternalStore } from "react";
 import {
   getCreatedJudeSessionIdsSnapshot,
   getJudeCurrentUserSnapshot,
+  getJudeSessionDiscoveryStateSnapshot,
   getJudeSessionsSnapshot,
+  subscribeToJudeSessionDiscoveryState,
   subscribeToCreatedJudeSessionIds,
   subscribeToJudeCurrentUser,
   subscribeToJudeSessions,
   type JudeCurrentUser,
+  type JudeSessionDiscoveryState,
   type JudeSession,
 } from "../connection/jude";
 
@@ -19,6 +22,14 @@ export function useJudeSessions(): ReadonlyArray<JudeSession> {
     subscribeToJudeSessions,
     getJudeSessionsSnapshot,
     () => EMPTY_JUDE_SESSIONS,
+  );
+}
+
+export function useJudeSessionDiscoveryState(): JudeSessionDiscoveryState {
+  return useSyncExternalStore(
+    subscribeToJudeSessionDiscoveryState,
+    getJudeSessionDiscoveryStateSnapshot,
+    () => "pending",
   );
 }
 
