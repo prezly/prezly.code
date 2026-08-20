@@ -3703,7 +3703,7 @@ export default function Sidebar() {
                       </span>
                       <ChevronDownIcon className="-mr-px size-4 shrink-0" />
                     </MenuTrigger>
-                    <MenuPopup align="start" className="w-[min(30rem,calc(100vw-1rem))]">
+                    <MenuPopup align="start" className="w-(--anchor-width)">
                       <MenuRadioGroup
                         value={projectScopeKey ?? "all"}
                         onValueChange={(value) =>
