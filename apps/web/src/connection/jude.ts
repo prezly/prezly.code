@@ -334,7 +334,16 @@ export const listJudeSessions = Effect.fn("web.jude.listSessions")(function* (
     publishJudeSessions(response.sessions);
     publishJudeSessionDiscoveryState("ready");
     return response.sessions;
-  }).pipe(Effect.tapError(() => Effect.sync(() => publishJudeSessionDiscoveryState("error"))));
+  }).pipe(
+    Effect.tapError(() =>
+      Effect.sync(() => {
+        // A refresh failure must not hide controls backed by the last known-good session list.
+        if (judeSessionDiscoveryStateSnapshot !== "ready") {
+          publishJudeSessionDiscoveryState("error");
+        }
+      }),
+    ),
+  );
 });
 
 export function refreshJudeEnvironments(): Promise<ReadonlyArray<JudeSession>> {

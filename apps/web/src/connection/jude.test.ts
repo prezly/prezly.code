@@ -156,18 +156,18 @@ describe("Jude discovery", () => {
     }),
   );
 
-  it.effect("only marks Jude discovery ready after a successful session read", () =>
+  it.effect("keeps Jude discovery ready after a later refresh failure", () =>
     Effect.gen(function* () {
-      const unavailable = vi
-        .fn<typeof globalThis.fetch>()
-        .mockResolvedValue(new Response(null, { status: 503 }));
-      yield* Effect.exit(listJudeSessions(unavailable));
-      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("error");
-
       const available = vi
         .fn<typeof globalThis.fetch>()
         .mockResolvedValue(Response.json({ sessions: [] }));
       yield* listJudeSessions(available);
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
+
+      const unavailable = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 503 }));
+      yield* Effect.exit(listJudeSessions(unavailable));
       expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
     }),
   );
