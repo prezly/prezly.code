@@ -15,6 +15,7 @@ import {
   getJudeSessionsSnapshot,
   isJudeSessionOwnedByCurrentUser,
   issueJudeT3Pairing,
+  judeSessionBranchName,
   judeSessionDisplayName,
   judeSessionNameForConnection,
   judeSessionOwnerLabel,
@@ -60,6 +61,21 @@ describe("Jude discovery", () => {
     expect(judeSessionProjectPickerName(sessions[0]!)).toBe("Admin v2 · Fix search");
     expect(judeSessionNameForConnection("jude:admin-fix-search", sessions)).toBe("Fix search");
     expect(judeSessionNameForConnection("remote:admin-fix-search", sessions)).toBeNull();
+  });
+
+  it("prefers Jude branch metadata over the environment name", () => {
+    expect(
+      judeSessionBranchName({
+        id: "website-fix-search",
+        name: "website-fix-search",
+        prompt: "Fix search",
+        project: "website",
+        baseRef: "main",
+        branch: "feature/fix-search",
+        status: "ready",
+        urls: { t3: "https://website-fix-search.t3.jude.prezly.dev" },
+      }),
+    ).toBe("feature/fix-search");
   });
 
   it("formats Jude owners and identifies the current user's sessions", () => {

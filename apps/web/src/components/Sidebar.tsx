@@ -106,6 +106,7 @@ import { PRODUCT_CAPABILITIES, PRODUCT_PROFILE } from "../branding";
 import {
   dismissCreatedJudeSession,
   isJudeSessionOwnedByCurrentUser,
+  judeSessionBranchName,
   judeSessionDetailUrlForConnection,
   judeSessionDisplayName,
   judeSessionIdFromConnectionId,
@@ -3748,7 +3749,8 @@ export default function Sidebar() {
                                     <span className="flex min-w-0 items-center gap-1 truncate font-normal text-muted-foreground text-xs">
                                       <span className="truncate">
                                         {session
-                                          ? judeSessionDisplayName(session)
+                                          ? (judeSessionBranchName(session) ??
+                                            project.workspaceRoot)
                                           : project.workspaceRoot}
                                       </span>
                                       {ownerLabel ? (

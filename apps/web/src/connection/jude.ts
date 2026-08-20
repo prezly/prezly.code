@@ -27,6 +27,9 @@ const JudeSessionSchema = Schema.Struct({
   visitUrl: Schema.optional(Schema.String),
   prompt: Schema.String,
   project: Schema.String,
+  // Jude has used both names while rolling out branch metadata.
+  baseRef: Schema.optional(Schema.String),
+  branch: Schema.optional(Schema.String),
   createdBy: Schema.optional(JudeCreatorSchema),
   status: JudeSessionStatus,
   urls: Schema.Struct({
@@ -112,6 +115,10 @@ export function judeSessionDisplayName(session: JudeSession): string {
 
 export function judeSessionProjectPickerName(session: JudeSession): string {
   return `${formatJudeAppName(session.project)} · ${judeSessionDisplayName(session)}`;
+}
+
+export function judeSessionBranchName(session: JudeSession): string | null {
+  return session.branch?.trim() || session.baseRef?.trim() || null;
 }
 
 export function judeSessionOwnerLabel(session: JudeSession): string | null {
