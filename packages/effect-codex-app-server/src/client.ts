@@ -1,6 +1,7 @@
 import * as Context from "effect/Context";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Ref from "effect/Ref";
 import * as Schema from "effect/Schema";
 import * as Scope from "effect/Scope";
 import * as Stdio from "effect/Stdio";
@@ -264,6 +265,31 @@ export const layerChildProcess = (
 const makeChildProcessClient = Effect.fn(
   "effect-codex-app-server/CodexAppServerClient.makeChildProcessClient",
 )(function* (handle: ChildProcessSpawner.ChildProcessHandle, options: CodexAppServerClientOptions) {
-  yield* Stream.runDrain(handle.stderr).pipe(Effect.ignore, Effect.forkScoped);
-  return yield* make(makeChildStdio(handle), options, makeTerminationError(handle));
+  const stderrTail = yield* Ref.make("");
+  yield* handle.stderr.pipe(
+    Stream.decodeText(),
+    Stream.runForEach((chunk) =>
+      Ref.update(stderrTail, (current) => truncateStderrTail(`${current}${chunk}`)),
+    ),
+    Effect.ignore,
+    Effect.forkScoped,
+  );
+  return yield* make(
+    makeChildStdio(handle),
+    options,
+    makeTerminationError(handle, Ref.get(stderrTail)),
+  );
 });
+
+const STDERR_TAIL_MAX_LENGTH = 4_000;
+
+function truncateStderrTail(stderr: string): string {
+  const sanitized = stderr
+    .replaceAll(/\x1B\[[0-?]*[ -/]*[@-~]/g, "")
+    .replaceAll(/\b(api[_-]?key|authorization|password|token)\s*[=:]\s*\S+/gi, "$1=[redacted]")
+    .replaceAll(/\bsk-[A-Za-z0-9_-]{8,}\b/g, "[redacted]")
+    .trim();
+  return sanitized.length > STDERR_TAIL_MAX_LENGTH
+    ? sanitized.slice(-STDERR_TAIL_MAX_LENGTH)
+    : sanitized;
+}
