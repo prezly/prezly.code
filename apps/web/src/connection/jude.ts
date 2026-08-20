@@ -139,7 +139,35 @@ const judeCurrentUserListeners = new Set<() => void>();
 let createdJudeSessionIdsSnapshot: ReadonlyArray<string> = [];
 const createdJudeSessionIdsListeners = new Set<() => void>();
 const judeEnvironmentRefreshListeners = new Set<() => void>();
-const requestedJudeEnvironmentConnectionIds = new Set<string>();
+const JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY = "p3code:jude:connected-environment-ids:v1";
+
+function readRequestedJudeEnvironmentConnectionIds(): ReadonlyArray<string> {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = window.localStorage.getItem(JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY);
+    if (!raw) return [];
+    const parsed: unknown = JSON.parse(raw);
+    return Array.isArray(parsed)
+      ? parsed.filter((value): value is string => typeof value === "string")
+      : [];
+  } catch {
+    return [];
+  }
+}
+
+const requestedJudeEnvironmentConnectionIds = new Set(readRequestedJudeEnvironmentConnectionIds());
+
+function persistRequestedJudeEnvironmentConnectionIds(): void {
+  if (typeof window === "undefined") return;
+  try {
+    window.localStorage.setItem(
+      JUDE_CONNECTED_ENVIRONMENT_IDS_STORAGE_KEY,
+      JSON.stringify([...requestedJudeEnvironmentConnectionIds]),
+    );
+  } catch {
+    // Connection opt-ins are still useful for this app session if storage is unavailable.
+  }
+}
 
 export const JUDE_DESKTOP_PROXY_PATH = "/_p3/jude";
 
@@ -263,6 +291,7 @@ export function subscribeToJudeEnvironmentRefresh(listener: () => void): () => v
  */
 export function requestJudeEnvironmentConnection(sessionId: string): void {
   requestedJudeEnvironmentConnectionIds.add(sessionId);
+  persistRequestedJudeEnvironmentConnectionIds();
   requestJudeEnvironmentRefresh();
 }
 
