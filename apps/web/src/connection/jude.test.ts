@@ -23,6 +23,7 @@ import {
   judeSessionDetailUrl,
   judeSessionDetailUrlForConnection,
   judeSessionIdFromConnectionId,
+  listJudeT3Environments,
   listJudeSessions,
   provisionJudeProject,
   requestJudeEnvironmentRefresh,
@@ -169,6 +170,68 @@ describe("Jude discovery", () => {
       ]);
       expect(getCreatedJudeSessionIdsSnapshot()).toBe(createdSessionIdsBeforeDiscovery);
       expect(fetch).toHaveBeenCalledWith("/_p3/jude/api/sessions", { method: "GET" });
+    }),
+  );
+
+  it.effect("uses Jude's aggregate T3 environment snapshot and ETag", () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValueOnce(
+          Response.json(
+            {
+              revision: "42",
+              retryAfterMs: 7_500,
+              environments: [
+                {
+                  id: "website-fix-search",
+                  name: "website-fix-search",
+                  prompt: "Fix search",
+                  project: "website",
+                  baseRef: "main",
+                  status: "ready",
+                  urls: { t3: "https://website-fix-search.t3.jude.prezly.dev" },
+                  t3: {
+                    state: "ready",
+                    pairing: {
+                      pairingUrl: "https://website-fix-search.t3.jude.prezly.dev/pair#token=fresh",
+                      expiresAt: "2026-08-20T12:00:00.000Z",
+                      serverVersion: "1.0.0",
+                    },
+                  },
+                },
+              ],
+            },
+            { headers: { ETag: '"42"' } },
+          ),
+        )
+        .mockResolvedValueOnce(new Response(null, { status: 304 }));
+
+      const updated = yield* listJudeT3Environments(null, fetch);
+      expect(updated).toMatchObject({
+        _tag: "Updated",
+        revision: "42",
+        etag: '"42"',
+        retryAfterMs: 7_500,
+      });
+      const unchanged = yield* listJudeT3Environments('"42"', fetch);
+      expect(unchanged).toEqual({ _tag: "NotModified" });
+      expect(fetch).toHaveBeenNthCalledWith(1, "/_p3/jude/api/t3/environments", {
+        method: "GET",
+      });
+      expect(fetch).toHaveBeenNthCalledWith(2, "/_p3/jude/api/t3/environments", {
+        method: "GET",
+        headers: { "If-None-Match": '"42"' },
+      });
+    }),
+  );
+
+  it.effect("only uses the legacy endpoint when the aggregate route is unavailable", () =>
+    Effect.gen(function* () {
+      const fetch = vi
+        .fn<typeof globalThis.fetch>()
+        .mockResolvedValue(new Response(null, { status: 404 }));
+      expect(yield* listJudeT3Environments(null, fetch)).toEqual({ _tag: "RouteUnavailable" });
     }),
   );
 

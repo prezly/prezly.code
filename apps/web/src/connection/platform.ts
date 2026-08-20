@@ -64,8 +64,10 @@ import {
   issueJudeT3Pairing,
   judeSessionDisplayName,
   listJudeSessions,
+  listJudeT3Environments,
   subscribeToJudeEnvironmentRefresh,
   type JudeSession,
+  type JudeT3Pairing,
 } from "./jude";
 
 let nextObservedRpcRequestId = 0;
@@ -368,8 +370,8 @@ const loadSecondaryConnectionRegistration = Effect.fn(
 
 const loadJudeConnectionRegistration = Effect.fn(
   "web.connectionPlatform.loadJudeConnectionRegistration",
-)(function* (session: JudeSession) {
-  const pairing = yield* issueJudeT3Pairing(session.id);
+)(function* (session: JudeSession, providedPairing?: JudeT3Pairing) {
+  const pairing = providedPairing ?? (yield* issueJudeT3Pairing(session.id));
   const pairingTarget = yield* Effect.try({
     try: () => resolveRemotePairingTarget({ pairingUrl: pairing.pairingUrl }),
     catch: (cause) =>
@@ -446,6 +448,19 @@ interface CachedPlatformRegistration {
   readonly registration: PlatformConnectionRegistration;
   readonly expiresAtEpochMs?: number;
   readonly refreshAtEpochMs?: number;
+}
+
+function retainedCachedPlatformRegistrations(
+  previous: ReadonlyMap<string, CachedPlatformRegistration>,
+  nowEpochMs: number,
+): PlatformConnectionRegistration[] {
+  const registrations: PlatformConnectionRegistration[] = [];
+  for (const cached of previous.values()) {
+    if (cached.expiresAtEpochMs === undefined || nowEpochMs < cached.expiresAtEpochMs) {
+      registrations.push(cached.registration);
+    }
+  }
+  return registrations;
 }
 
 export type PrimaryEnvironmentTargetRead =
@@ -528,6 +543,8 @@ const platformConnectionSourceLayer = Layer.effect(
     const cacheRef = yield* Ref.make(new Map<string, CachedPlatformRegistration>());
 
     if (PRODUCT_PROFILE.id === "p3") {
+      const judeSnapshotEtagRef = yield* Ref.make<string | null>(null);
+      const judeSnapshotRetryAfterMsRef = yield* Ref.make(5_000);
       const manualRefreshes = Stream.callback<void>((queue) =>
         Effect.acquireRelease(
           Effect.sync(() =>
@@ -539,30 +556,64 @@ const platformConnectionSourceLayer = Layer.effect(
       const buildJudePlatformRegistrations = Effect.gen(function* () {
         const previous = yield* Ref.get(cacheRef);
         const nowEpochMs = yield* Clock.currentTimeMillis;
-        const sessionsResult = yield* listJudeSessions().pipe(Effect.result);
+        const snapshotResult = yield* listJudeT3Environments(
+          yield* Ref.get(judeSnapshotEtagRef),
+        ).pipe(Effect.result);
 
-        if (sessionsResult._tag === "Failure") {
+        if (snapshotResult._tag === "Failure") {
           yield* Effect.logWarning(
-            `Could not refresh Jude environments: ${sessionsResult.failure.message}`,
+            `Could not refresh Jude environments: ${snapshotResult.failure.message}`,
           );
-          return [...previous.values()]
-            .filter(
-              (cached) =>
-                cached.expiresAtEpochMs === undefined || nowEpochMs < cached.expiresAtEpochMs,
-            )
-            .map((cached) => cached.registration);
+          return retainedCachedPlatformRegistrations(previous, nowEpochMs);
+        }
+
+        if (snapshotResult.success._tag === "NotModified") {
+          return retainedCachedPlatformRegistrations(previous, nowEpochMs);
+        }
+
+        const snapshot = snapshotResult.success;
+        let connectableSessions: Array<{
+          readonly session: JudeSession;
+          readonly pairing?: JudeT3Pairing;
+        }>;
+        if (snapshot._tag === "RouteUnavailable") {
+          const legacySessionsResult = yield* listJudeSessions().pipe(Effect.result);
+          if (legacySessionsResult._tag === "Failure") {
+            yield* Effect.logWarning(
+              `Could not refresh Jude environments through the legacy endpoint: ${legacySessionsResult.failure.message}`,
+            );
+            return retainedCachedPlatformRegistrations(previous, nowEpochMs);
+          }
+          connectableSessions = [];
+          for (const session of legacySessionsResult.success) {
+            if (canConnectToJudeT3Session(session)) connectableSessions.push({ session });
+          }
+        } else {
+          yield* Ref.set(judeSnapshotEtagRef, snapshot.etag ?? snapshot.revision);
+          const environmentRetryAfterMs = Math.max(
+            0,
+            ...snapshot.environments.map((environment) => environment.t3.retryAfterMs ?? 0),
+          );
+          yield* Ref.set(
+            judeSnapshotRetryAfterMsRef,
+            Math.max(1_000, snapshot.retryAfterMs ?? 5_000, environmentRetryAfterMs),
+          );
+          connectableSessions = snapshot.environments.flatMap((environment) =>
+            environment.t3.state === "ready" && environment.t3.pairing
+              ? [{ session: environment, pairing: environment.t3.pairing }]
+              : [],
+          );
         }
 
         const next = new Map<string, CachedPlatformRegistration>();
         const registrations: PlatformConnectionRegistration[] = [];
-        const connectableSessions = sessionsResult.success.filter(canConnectToJudeT3Session);
 
         yield* Effect.forEach(
           connectableSessions,
-          (session) =>
+          ({ session, pairing }) =>
             Effect.gen(function* () {
               const cacheKey = `jude:${session.id}`;
-              const signature = `${session.id}|${session.name}|${session.urls.t3}`;
+              const signature = `${session.id}|${session.name}|${session.urls.t3}|${pairing?.pairingUrl ?? ""}`;
               const cached = previous.get(cacheKey);
               if (
                 cached !== undefined &&
@@ -573,7 +624,7 @@ const platformConnectionSourceLayer = Layer.effect(
                 return;
               }
 
-              const built = yield* loadJudeConnectionRegistration(session).pipe(
+              const built = yield* loadJudeConnectionRegistration(session, pairing).pipe(
                 Effect.tapError((error) =>
                   Effect.logWarning("Could not connect a Jude environment.", {
                     sessionId: session.id,
@@ -605,11 +656,24 @@ const platformConnectionSourceLayer = Layer.effect(
         return registrations;
       }).pipe(Effect.provide(FetchHttpClient.layer));
 
+      let hasPolledJude = false;
+      const scheduledJudeRegistrations = Stream.fromEffectRepeat(
+        Effect.suspend(() =>
+          Effect.gen(function* () {
+            if (hasPolledJude) {
+              yield* Effect.sleep(yield* Ref.get(judeSnapshotRetryAfterMsRef));
+            }
+            hasPolledJude = true;
+            return yield* buildJudePlatformRegistrations;
+          }),
+        ),
+      );
+
       return PlatformConnectionSource.of({
         registrations: Stream.merge(
-          Stream.concat(Stream.succeed(undefined), Stream.tick(PLATFORM_POLL_INTERVAL)),
-          manualRefreshes,
-        ).pipe(Stream.mapEffect(() => buildJudePlatformRegistrations)),
+          scheduledJudeRegistrations,
+          manualRefreshes.pipe(Stream.mapEffect(() => buildJudePlatformRegistrations)),
+        ),
       });
     }
 
