@@ -571,6 +571,7 @@ const platformConnectionSourceLayer = Layer.effect(
     if (PRODUCT_PROFILE.id === "p3") {
       const judeSnapshotEtagRef = yield* Ref.make<string | null>(null);
       const judeSnapshotRetryAfterMsRef = yield* Ref.make(5_000);
+      const judeSnapshotEnvironmentsRef = yield* Ref.make<ReadonlyArray<JudeT3Environment>>([]);
       const manualRefreshes = Stream.callback<void>((queue) =>
         Effect.acquireRelease(
           Effect.sync(() =>
@@ -593,16 +594,17 @@ const platformConnectionSourceLayer = Layer.effect(
           return retainedCachedPlatformRegistrations(previous, nowEpochMs);
         }
 
-        if (snapshotResult.success._tag === "NotModified") {
-          return retainedCachedPlatformRegistrations(previous, nowEpochMs);
-        }
-
-        const snapshot = snapshotResult.success;
         let connectableSessions: Array<{
           readonly session: JudeSession;
           readonly pairing?: JudeT3Pairing;
         }>;
-        if (snapshot._tag === "RouteUnavailable") {
+        if (snapshotResult.success._tag === "NotModified") {
+          // An explicit shared-environment opt-in does not change Jude's
+          // aggregate revision. Reuse the retained snapshot to connect it.
+          connectableSessions = judeT3SessionsToBootstrap(
+            yield* Ref.get(judeSnapshotEnvironmentsRef),
+          );
+        } else if (snapshotResult.success._tag === "RouteUnavailable") {
           const legacySessionsResult = yield* listJudeSessions().pipe(Effect.result);
           if (legacySessionsResult._tag === "Failure") {
             yield* Effect.logWarning(
@@ -621,7 +623,9 @@ const platformConnectionSourceLayer = Layer.effect(
             }
           }
         } else {
+          const snapshot = snapshotResult.success;
           yield* Ref.set(judeSnapshotEtagRef, snapshot.etag ?? snapshot.revision);
+          yield* Ref.set(judeSnapshotEnvironmentsRef, snapshot.environments);
           const environmentRetryAfterMs = Math.max(
             0,
             ...snapshot.environments.map((environment) => environment.t3.retryAfterMs ?? 0),
