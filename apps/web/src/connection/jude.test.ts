@@ -235,6 +235,34 @@ describe("Jude discovery", () => {
     }),
   );
 
+  it.effect("keeps an environment snapshot usable when a pairing artifact is incomplete", () =>
+    Effect.gen(function* () {
+      const fetch = vi.fn<typeof globalThis.fetch>().mockResolvedValue(
+        Response.json({
+          revision: "43",
+          environments: [
+            {
+              id: "website-starting-pairing",
+              name: "website-starting-pairing",
+              prompt: "Fix search",
+              project: "website",
+              status: "ready",
+              urls: { t3: "https://website-starting-pairing.t3.jude.prezly.dev" },
+              t3: { state: "ready", pairing: {} },
+            },
+          ],
+        }),
+      );
+
+      const snapshot = yield* listJudeT3Environments(null, fetch);
+      expect(snapshot).toMatchObject({ _tag: "Updated", revision: "43" });
+      if (snapshot._tag === "Updated") {
+        expect(snapshot.environments[0]?.t3.pairing).toBeUndefined();
+      }
+      expect(getJudeSessionDiscoveryStateSnapshot()).toBe("ready");
+    }),
+  );
+
   it.effect("keeps Jude discovery ready after a later refresh failure", () =>
     Effect.gen(function* () {
       const available = vi

@@ -47,6 +47,15 @@ const JudeT3PairingSchema = Schema.Struct({
   serverVersion: Schema.String,
 });
 
+// Jude may include an empty pairing object while its asynchronous pairing
+// artifact is still being prepared. Treat that the same as no artifact: the
+// snapshot remains useful for discovery, but must not trigger a T3 bootstrap.
+const JudeT3PairingPayloadSchema = Schema.Struct({
+  pairingUrl: Schema.optional(Schema.String),
+  expiresAt: Schema.optional(Schema.String),
+  serverVersion: Schema.optional(Schema.String),
+});
+
 const JudeT3EnvironmentState = Schema.Literals(["ready", "starting", "unavailable"]);
 
 const JudeT3EnvironmentSchema = Schema.Struct({
@@ -64,7 +73,7 @@ const JudeT3EnvironmentSchema = Schema.Struct({
     state: JudeT3EnvironmentState,
     retryAfterMs: Schema.optional(Schema.Number),
     reason: Schema.optional(Schema.Literals(["service-not-ready", "pairing-unavailable"])),
-    pairing: Schema.optional(JudeT3PairingSchema),
+    pairing: Schema.optional(JudeT3PairingPayloadSchema),
   }),
 });
 
@@ -104,7 +113,14 @@ export function isJudeSessionOperational(session: JudeSession): boolean {
   return session.status === "ready" || session.status === "degraded";
 }
 export type JudeT3Pairing = typeof JudeT3PairingSchema.Type;
-export type JudeT3Environment = typeof JudeT3EnvironmentSchema.Type;
+export type JudeT3Environment = JudeSession & {
+  readonly t3: {
+    readonly state: "ready" | "starting" | "unavailable";
+    readonly retryAfterMs?: number | undefined;
+    readonly reason?: "service-not-ready" | "pairing-unavailable" | undefined;
+    readonly pairing?: JudeT3Pairing | undefined;
+  };
+};
 export type JudeT3EnvironmentsSnapshot =
   | {
       readonly _tag: "NotModified";
@@ -119,6 +135,16 @@ export type JudeT3EnvironmentsSnapshot =
       readonly retryAfterMs: number | undefined;
       readonly environments: ReadonlyArray<JudeT3Environment>;
     };
+
+function isJudeT3Pairing(
+  value: typeof JudeT3PairingPayloadSchema.Type | undefined,
+): value is JudeT3Pairing {
+  return (
+    value?.pairingUrl !== undefined &&
+    value.expiresAt !== undefined &&
+    value.serverVersion !== undefined
+  );
+}
 export type JudeModel = typeof JudeModelSchema.Type;
 
 export interface CreateJudeSessionInput {
@@ -433,17 +459,29 @@ export const listJudeT3Environments = Effect.fn("web.jude.listT3Environments")(f
     try: async (): Promise<unknown> => response.json(),
     catch: (cause) => discoveryError("T3 environment discovery", cause),
   });
-  const snapshot = yield* decodeJudeT3EnvironmentsResponse(body).pipe(
+  const rawSnapshot = yield* decodeJudeT3EnvironmentsResponse(body).pipe(
     Effect.mapError((cause) => discoveryError("T3 environment discovery", cause)),
   );
-  publishJudeSessions(snapshot.environments);
+  const environments: ReadonlyArray<JudeT3Environment> = rawSnapshot.environments.map(
+    (environment) => {
+      const { pairing, ...t3 } = environment.t3;
+      return {
+        ...environment,
+        t3: {
+          ...t3,
+          ...(isJudeT3Pairing(pairing) ? { pairing } : {}),
+        },
+      };
+    },
+  );
+  publishJudeSessions(environments);
   publishJudeSessionDiscoveryState("ready");
   return {
     _tag: "Updated",
-    revision: snapshot.revision,
+    revision: rawSnapshot.revision,
     etag: response.headers.get("ETag"),
-    retryAfterMs: snapshot.retryAfterMs,
-    environments: snapshot.environments,
+    retryAfterMs: rawSnapshot.retryAfterMs,
+    environments,
   } as const;
 });
 
